@@ -94,6 +94,7 @@ func BootStrap(config *BootStrapConfig) {
 	patientUC := &usecase.PatientUseCase{
 		DB:          config.DB,
 		PatientRepo: patientRepo,
+		NakesRepo:   nakesRepo,
 		Log:         config.Log,
 	}
 	patientRegUC := &usecase.PatientRegistrationUseCase{

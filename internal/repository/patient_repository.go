@@ -27,6 +27,14 @@ func (r *PatientRepository) FindByNIK(db *gorm.DB, nik string) (*entity.Patient,
 	return &patient, nil
 }
 
+func (r *PatientRepository) FindByID(db *gorm.DB, id string) (*entity.Patient, error) {
+	var patient entity.Patient
+	if err := db.Where("id = ?", id).First(&patient).Error; err != nil {
+		return nil, fmt.Errorf("finding patient by id: %w", err)
+	}
+	return &patient, nil
+}
+
 // FindByFaskesID mengembalikan satu halaman pasien milik faskes (semua status),
 // diurutkan enrolled_at DESC, beserta total seluruh pasien faskes untuk pagination.
 func (r *PatientRepository) FindByFaskesID(db *gorm.DB, faskesID string, limit, offset int) ([]entity.Patient, int64, error) {

@@ -47,6 +47,7 @@ func (r *RouteConfig) SetupFaskesAuthedRoute() {
 	g.POST("/nakes/register", r.NakesRegistrationController.RegisterNakes)
 	g.PATCH("/nakes/:id/status", r.NakesController.UpdateStatus)
 	g.GET("/patients", r.PatientController.ListPatients)
+	g.GET("/patients/:id", r.PatientController.GetPatientDetail)
 	g.POST("/patients/register/ktp-ocr", r.PatientRegistrationController.ScanKTP)
 	g.POST("/patients/register", r.PatientRegistrationController.RegisterPatient)
 }
