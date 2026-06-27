@@ -20,6 +20,7 @@ type RouteConfig struct {
 	NakesController               *controller.NakesController
 	PatientRegistrationController *controller.PatientRegistrationController
 	DashboardController           *controller.DashboardController
+	PatientDashboardController    *controller.PatientDashboardController
 }
 
 func (r *RouteConfig) SetUp() {
@@ -28,6 +29,7 @@ func (r *RouteConfig) SetUp() {
 	r.SetupNakesGuestRoute()
 	r.SetupNakesAuthedRoute()
 	r.SetupPatientGuestRoute()
+	r.SetupPatientAuthedRoute()
 	r.SetupTokenRoute()
 }
 
@@ -60,6 +62,11 @@ func (r *RouteConfig) SetupNakesAuthedRoute() {
 func (r *RouteConfig) SetupPatientGuestRoute() {
 	g := r.App.Group("/api/v1/patients/auth")
 	g.POST("/login", r.PatientAuthController.Login)
+}
+
+func (r *RouteConfig) SetupPatientAuthedRoute() {
+	g := r.App.Group("/api/v1/patients", middleware.PatientAuth(r.JWTHelper))
+	g.GET("/dashboard", r.PatientDashboardController.GetDashboard)
 }
 
 func (r *RouteConfig) SetupTokenRoute() {
