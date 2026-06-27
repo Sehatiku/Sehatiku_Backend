@@ -32,3 +32,15 @@ type NakesRegisterResponse struct {
 	NIK        string    `json:"nik"`
 	EnrolledAt time.Time `json:"enrolled_at"`
 }
+
+// ── Nakes List ───────────────────────────────────────────────────────────────
+
+type NakesListItem struct {
+	NakesID     string    `json:"nakes_id"`
+	FullName    string    `json:"full_name"`
+	Role        string    `json:"role"`
+	Username    string    `json:"username"`
+	PhoneNumber string    `json:"phone_number"`
+	Status      string    `json:"status"`
+	EnrolledAt  time.Time `json:"enrolled_at"`
+}

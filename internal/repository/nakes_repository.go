@@ -26,3 +26,11 @@ func (r *NakesRepository) FindByNIK(db *gorm.DB, nik string) (*entity.Nakes, err
 	}
 	return &nakes, nil
 }
+
+func (r *NakesRepository) FindByFaskesID(db *gorm.DB, faskesID string) ([]entity.Nakes, error) {
+	var list []entity.Nakes
+	if err := db.Where("faskes_id = ?", faskesID).Order("enrolled_at DESC").Find(&list).Error; err != nil {
+		return nil, fmt.Errorf("finding nakes by faskes_id: %w", err)
+	}
+	return list, nil
+}
