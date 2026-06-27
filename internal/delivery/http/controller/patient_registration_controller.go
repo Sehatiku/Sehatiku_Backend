@@ -42,7 +42,7 @@ func (c *PatientRegistrationController) ScanKTP(ctx *echo.Context) error {
 }
 
 func (c *PatientRegistrationController) RegisterPatient(ctx *echo.Context) error {
-	nakesClaims := getNakesClaimsFromCtx(ctx)
+	claims := getFaskesClaimsFromCtx(ctx)
 
 	req := new(model.PatientRegisterRequest)
 	if err := ctx.Bind(req); err != nil {
@@ -60,8 +60,7 @@ func (c *PatientRegistrationController) RegisterPatient(ctx *echo.Context) error
 
 	resp, err := c.UseCase.RegisterPatient(
 		ctx.Request().Context(),
-		nakesClaims.FaskesID,
-		nakesClaims.NakesID,
+		claims.FaskesID,
 		req,
 	)
 	if err != nil {

@@ -16,9 +16,14 @@ import (
 	"gorm.io/gorm"
 )
 
+// ErrAssignedNakesInvalid dikembalikan bila assigned_nakes_id pada request tidak
+// merujuk ke nakes mana pun, atau merujuk ke nakes milik faskes lain (isolasi tenant).
+var ErrAssignedNakesInvalid = errors.New("assigned_nakes_id tidak valid atau bukan milik faskes ini")
+
 type PatientRegistrationUseCase struct {
 	DB          *gorm.DB
 	PatientRepo patientRepo
+	NakesRepo   patientRegNakesRepo
 	OCRGateway  *ocr.KTPOCRGateway
 	WhatsApp    *whatsapp.WhatsAppGateway
 	Log         *zap.Logger
@@ -30,6 +35,10 @@ type patientRepo interface {
 	Create(db *gorm.DB, entity *entity.Patient) error
 }
 
+type patientRegNakesRepo interface {
+	FindByID(db *gorm.DB, id string) (*entity.Nakes, error)
+}
+
 func (u *PatientRegistrationUseCase) ScanKTP(ctx context.Context, file multipart.File, filename string) (*model.KTPOCRResponse, error) {
 	result, err := u.OCRGateway.ExtractKTP(ctx, file, filename)
 	if err != nil {
@@ -38,8 +47,22 @@ func (u *PatientRegistrationUseCase) ScanKTP(ctx context.Context, file multipart
 	return convertOCRResult(result), nil
 }
 
-func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskesID, nakesID string, req *model.PatientRegisterRequest) (*model.PatientRegisterResponse, error) {
-	_, err := u.PatientRepo.FindByNIK(u.DB, req.NIK)
+func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskesID string, req *model.PatientRegisterRequest) (*model.PatientRegisterResponse, error) {
+	// Validasi assigned_nakes_id dikirim faskes: harus nakes yang benar-benar ada DAN
+	// milik faskes yang sedang login. Pesan diseragamkan agar keberadaan nakes milik
+	// faskes lain tidak bocor lintas tenant.
+	nakes, err := u.NakesRepo.FindByID(u.DB, req.AssignedNakesID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrAssignedNakesInvalid
+		}
+		return nil, fmt.Errorf("checking assigned nakes: %w", err)
+	}
+	if nakes.FaskesID != faskesID {
+		return nil, ErrAssignedNakesInvalid
+	}
+
+	_, err = u.PatientRepo.FindByNIK(u.DB, req.NIK)
 	if err == nil {
 		return nil, ErrNIKAlreadyExists
 	}
@@ -68,7 +91,7 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 	now := time.Now()
 	patient := &entity.Patient{
 		FaskesID:        faskesID,
-		AssignedNakesID: nakesID,
+		AssignedNakesID: req.AssignedNakesID,
 		Username:        req.Username,
 		PasswordHash:    string(hash),
 		FullName:        req.FullName,

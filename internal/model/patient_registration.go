@@ -5,6 +5,7 @@ import "time"
 // ── Patient Registration ─────────────────────────────────────────────────────
 
 type PatientRegisterRequest struct {
+	AssignedNakesID string `json:"assigned_nakes_id" validate:"required"`
 	NIK            string `json:"nik"             validate:"required"`
 	FullName       string `json:"full_name"       validate:"required"`
 	DateOfBirth    string `json:"date_of_birth"   validate:"required"` // YYYY-MM-DD

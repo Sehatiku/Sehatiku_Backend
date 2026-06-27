@@ -47,6 +47,8 @@ func (r *RouteConfig) SetupFaskesAuthedRoute() {
 	g.POST("/nakes/register", r.NakesRegistrationController.RegisterNakes)
 	g.PATCH("/nakes/:id/status", r.NakesController.UpdateStatus)
 	g.GET("/patients", r.PatientController.ListPatients)
+	g.POST("/patients/register/ktp-ocr", r.PatientRegistrationController.ScanKTP)
+	g.POST("/patients/register", r.PatientRegistrationController.RegisterPatient)
 }
 
 func (r *RouteConfig) SetupNakesGuestRoute() {
@@ -56,8 +58,6 @@ func (r *RouteConfig) SetupNakesGuestRoute() {
 
 func (r *RouteConfig) SetupNakesAuthedRoute() {
 	g := r.App.Group("/api/v1/nakes", middleware.NakesAuth(r.JWTHelper))
-	g.POST("/patients/register/ktp-ocr", r.PatientRegistrationController.ScanKTP)
-	g.POST("/patients/register", r.PatientRegistrationController.RegisterPatient)
 	g.GET("/dashboard/summary", r.DashboardController.GetSummary)
 	g.GET("/dashboard/patient-queue", r.DashboardController.GetPatientQueue)
 }
