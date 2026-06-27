@@ -96,6 +96,12 @@ func BootStrap(config *BootStrapConfig) {
 		OCRGateway:  ktpOCRGateway,
 		Log:         config.Log,
 	}
+	dashboardRepo := &repository.DashboardRepository{}
+	dashboardUC := &usecase.DashboardUseCase{
+		DB:            config.DB,
+		DashboardRepo: dashboardRepo,
+		Log:           config.Log,
+	}
 
 	// Controllers
 	faskesAuthCtrl := &controller.FaskesAuthController{UseCase: faskesAuthUC}
@@ -105,6 +111,10 @@ func BootStrap(config *BootStrapConfig) {
 	nakesRegCtrl := &controller.NakesRegistrationController{UseCase: nakesRegUC}
 	nakesCtrl := &controller.NakesController{UseCase: nakesUC}
 	patientRegCtrl := &controller.PatientRegistrationController{UseCase: patientRegUC}
+	dashboardCtrl := &controller.DashboardController{
+		SummaryUseCase: dashboardUC,
+		QueueUseCase:   dashboardUC,
+	}
 
 	routeConfig := routing.RouteConfig{
 		App:                           config.App,
@@ -116,6 +126,7 @@ func BootStrap(config *BootStrapConfig) {
 		NakesRegistrationController:   nakesRegCtrl,
 		NakesController:               nakesCtrl,
 		PatientRegistrationController: patientRegCtrl,
+		DashboardController:           dashboardCtrl,
 	}
 	routeConfig.SetUp()
 }
