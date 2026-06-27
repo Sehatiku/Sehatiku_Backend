@@ -102,6 +102,13 @@ func BootStrap(config *BootStrapConfig) {
 		DashboardRepo: dashboardRepo,
 		Log:           config.Log,
 	}
+	patientDashboardRepo := &repository.PatientDashboardRepository{}
+	patientDashboardUC := &usecase.PatientDashboardUseCase{
+		DB:          config.DB,
+		Repo:        patientDashboardRepo,
+		PatientRepo: patientRepo,
+		Log:         config.Log,
+	}
 
 	// Controllers
 	faskesAuthCtrl := &controller.FaskesAuthController{UseCase: faskesAuthUC}
@@ -115,6 +122,7 @@ func BootStrap(config *BootStrapConfig) {
 		SummaryUseCase: dashboardUC,
 		QueueUseCase:   dashboardUC,
 	}
+	patientDashboardCtrl := &controller.PatientDashboardController{UseCase: patientDashboardUC}
 
 	config.App.Validator = &CustomValidator{validator: config.Validate}
 
@@ -129,6 +137,7 @@ func BootStrap(config *BootStrapConfig) {
 		NakesController:               nakesCtrl,
 		PatientRegistrationController: patientRegCtrl,
 		DashboardController:           dashboardCtrl,
+		PatientDashboardController:    patientDashboardCtrl,
 	}
 	routeConfig.SetUp()
 }
