@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"sehatiku-backend/internal/entity"
 	"sehatiku-backend/internal/gateway/ocr"
+	"sehatiku-backend/internal/gateway/whatsapp"
 	"sehatiku-backend/internal/model"
 	"time"
 
@@ -19,6 +20,7 @@ type PatientRegistrationUseCase struct {
 	DB          *gorm.DB
 	PatientRepo patientRepo
 	OCRGateway  *ocr.KTPOCRGateway
+	WhatsApp    *whatsapp.WhatsAppGateway
 	Log         *zap.Logger
 }
 
@@ -87,6 +89,20 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 	}
 
 	u.Log.Info("patient registered", zap.String("patient_id", patient.ID), zap.String("faskes_id", faskesID))
+
+	// Kirim kredensial login ke WA pasien dan pendamping secara fire-and-forget —
+	// kegagalan WA tidak boleh menggagalkan registrasi yang sudah tersimpan.
+	go func(p entity.Patient, password string) {
+		if err := u.WhatsApp.SendRegistrationCredentials(context.Background(), p.PhoneNumber, p.FullName, p.Username, password); err != nil {
+			u.Log.Warn("failed to send wa registration credentials to patient", zap.String("patient_id", p.ID), zap.Error(err))
+		}
+		if p.CompanionPhone == "" {
+			return
+		}
+		if err := u.WhatsApp.SendCompanionRegistrationCredentials(context.Background(), p.CompanionPhone, p.CompanionName, p.FullName, p.Username, password); err != nil {
+			u.Log.Warn("failed to send wa registration credentials to companion", zap.String("patient_id", p.ID), zap.Error(err))
+		}
+	}(*patient, req.Password)
 
 	return &model.PatientRegisterResponse{
 		PatientID:   patient.ID,
