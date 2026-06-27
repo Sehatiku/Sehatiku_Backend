@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const accessTokenTTL = 15 * time.Minute
+const accessTokenTTL = 12 * time.Hour
 
 type JWTHelper struct {
 	Secret string
