@@ -47,6 +47,21 @@ func mapNakesError(ctx *echo.Context, err error) error {
 	}
 }
 
+func mapPatientError(ctx *echo.Context, err error) error {
+	switch {
+	case errors.Is(err, usecase.ErrPatientNotFound):
+		return ctx.JSON(http.StatusNotFound, model.WebResponse[any]{
+			Message: "not found",
+			Errors:  err.Error(),
+		})
+	default:
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
+			Message: "internal server error",
+			Errors:  err.Error(),
+		})
+	}
+}
+
 func mapRegistrationError(ctx *echo.Context, err error) error {
 	switch {
 	case errors.Is(err, usecase.ErrNIKAlreadyExists),

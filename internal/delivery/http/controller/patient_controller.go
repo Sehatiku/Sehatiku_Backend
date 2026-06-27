@@ -9,12 +9,13 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-type patientListUseCase interface {
+type patientUseCase interface {
 	ListPatients(ctx context.Context, faskesID string, page, size int) ([]model.PatientListItem, model.PageMetadata, error)
+	GetPatientDetail(ctx context.Context, faskesID, patientID string) (*model.PatientDetailResponse, error)
 }
 
 type PatientController struct {
-	UseCase patientListUseCase
+	UseCase patientUseCase
 }
 
 func (c *PatientController) ListPatients(ctx *echo.Context) error {
@@ -41,5 +42,27 @@ func (c *PatientController) ListPatients(ctx *echo.Context) error {
 		Message: "daftar pasien berhasil diambil",
 		Data:    items,
 		Paging:  &paging,
+	})
+}
+
+func (c *PatientController) GetPatientDetail(ctx *echo.Context) error {
+	claims := getFaskesClaimsFromCtx(ctx)
+
+	patientID := ctx.Param("id")
+	if patientID == "" {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
+			Message: "bad request",
+			Errors:  "patient id wajib diisi",
+		})
+	}
+
+	detail, err := c.UseCase.GetPatientDetail(ctx.Request().Context(), claims.FaskesID, patientID)
+	if err != nil {
+		return mapPatientError(ctx, err)
+	}
+
+	return ctx.JSON(http.StatusOK, model.WebResponse[*model.PatientDetailResponse]{
+		Message: "detail pasien berhasil diambil",
+		Data:    detail,
 	})
 }
