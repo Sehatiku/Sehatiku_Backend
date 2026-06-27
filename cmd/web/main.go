@@ -10,6 +10,9 @@ func main() {
 	redis := config.SetUpRedis(cfg, log)
 	app := config.NewEcho(cfg)
 	jwt := config.SetUpJWT(cfg, log)
+	wa := config.SetUpWhatsApp(cfg, log, db)
+	defer wa.Client.Disconnect()
+
 	config.BootStrap(&config.BootStrapConfig{
 		DB:       db,
 		App:      app,
@@ -18,6 +21,7 @@ func main() {
 		Config:   cfg,
 		Redis:    redis,
 		JWT:      jwt,
+		WhatsApp: wa,
 	})
 
 	port := cfg.GetString("APP_PORT")

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -16,7 +17,18 @@ func ConnectDB(viper *viper.Viper, log *zap.Logger) *gorm.DB {
 		log.Fatal("DATABASE_URL is  required")
 	}
 
-	db, err := gorm.Open(postgres.Open(dbURL+"?sslmode=require"), &gorm.Config{})
+	if !strings.Contains(dbURL, "sslmode=") {
+		if strings.Contains(dbURL, "?") {
+			dbURL += "&sslmode=require"
+		} else {
+			dbURL += "?sslmode=require"
+		}
+	}
+
+	db, err := gorm.Open(postgres.New(postgres.Config{
+		DSN:                  dbURL,
+		PreferSimpleProtocol: true,
+	}), &gorm.Config{})
 
 	if err != nil {
 		log.Fatal("failed to connect database", zap.Error(err))

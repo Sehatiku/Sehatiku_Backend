@@ -1,0 +1,34 @@
+package model
+
+import "time"
+
+// ── KTP OCR pre-fill ─────────────────────────────────────────────────────────
+
+type KTPOCRResponse struct {
+	NIK         string `json:"nik"`
+	FullName    string `json:"full_name"`
+	DateOfBirth string `json:"date_of_birth"` // YYYY-MM-DD
+	Sex         string `json:"sex"`            // male | female
+	Alamat      string `json:"alamat"`
+}
+
+// ── Nakes Registration ───────────────────────────────────────────────────────
+
+type NakesRegisterRequest struct {
+	NIK         string `json:"nik"          validate:"required"`
+	FullName    string `json:"full_name"    validate:"required"`
+	Alamat      string `json:"alamat"       validate:"required"`
+	PhoneNumber string `json:"phone_number" validate:"required"`
+	Role        string `json:"role"         validate:"required,oneof=dokter kader admin"`
+	Username    string `json:"username"     validate:"required,min=4,max=50"`
+	Password    string `json:"password"     validate:"required,min=8"`
+}
+
+type NakesRegisterResponse struct {
+	NakesID    string    `json:"nakes_id"`
+	FaskesID   string    `json:"faskes_id"`
+	FullName   string    `json:"full_name"`
+	Role       string    `json:"role"`
+	NIK        string    `json:"nik"`
+	EnrolledAt time.Time `json:"enrolled_at"`
+}
