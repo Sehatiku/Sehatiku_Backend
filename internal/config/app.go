@@ -83,6 +83,7 @@ func BootStrap(config *BootStrapConfig) {
 		DB:         config.DB,
 		NakesRepo:  nakesRepo,
 		OCRGateway: ktpOCRGateway,
+		WhatsApp:   config.WhatsApp,
 		Log:        config.Log,
 	}
 	nakesUC := &usecase.NakesUseCase{
@@ -94,6 +95,7 @@ func BootStrap(config *BootStrapConfig) {
 		DB:          config.DB,
 		PatientRepo: patientRepo,
 		OCRGateway:  ktpOCRGateway,
+		WhatsApp:    config.WhatsApp,
 		Log:         config.Log,
 	}
 	dashboardRepo := &repository.DashboardRepository{}

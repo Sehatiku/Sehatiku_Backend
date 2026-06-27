@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"sehatiku-backend/internal/entity"
 	"sehatiku-backend/internal/gateway/ocr"
+	"sehatiku-backend/internal/gateway/whatsapp"
 	"sehatiku-backend/internal/model"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ type NakesRegistrationUseCase struct {
 	DB         *gorm.DB
 	NakesRepo  nakesRepo
 	OCRGateway *ocr.KTPOCRGateway
+	WhatsApp   *whatsapp.WhatsAppGateway
 	Log        *zap.Logger
 }
 
@@ -80,6 +82,14 @@ func (u *NakesRegistrationUseCase) RegisterNakes(ctx context.Context, faskesID s
 	}
 
 	u.Log.Info("nakes registered", zap.String("nakes_id", nakes.ID), zap.String("faskes_id", faskesID))
+
+	// Kirim kredensial login ke WA nakes secara fire-and-forget — kegagalan WA tidak
+	// boleh menggagalkan registrasi yang sudah tersimpan (pola sama dengan login).
+	go func(phone, name, username, password string) {
+		if err := u.WhatsApp.SendRegistrationCredentials(context.Background(), phone, name, username, password); err != nil {
+			u.Log.Warn("failed to send wa registration credentials", zap.String("nakes_id", nakes.ID), zap.Error(err))
+		}
+	}(nakes.PhoneNumber, nakes.FullName, nakes.Username, req.Password)
 
 	return &model.NakesRegisterResponse{
 		NakesID:    nakes.ID,
