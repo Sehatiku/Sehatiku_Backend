@@ -98,7 +98,7 @@ func (u *NakesRegistrationUseCase) RegisterNakes(ctx context.Context, faskesID s
 func convertOCRResult(r *ocr.KTPOCRResult) *model.KTPOCRResponse {
 	dob := convertDate(r.TanggalLahir)
 	sex := convertSex(r.JenisKelamin)
-	alamat := buildAlamat(r.Alamat, r.RTRW, r.Kelurahan, r.Kecamatan, r.Kota)
+	alamat := buildAlamat(r.Alamat, r.RT, r.RW, r.Kelurahan, r.Kecamatan, r.Kota)
 
 	return &model.KTPOCRResponse{
 		NIK:         r.NIK,
@@ -124,10 +124,10 @@ func convertSex(jenisKelamin string) string {
 	return "female"
 }
 
-func buildAlamat(alamat, rtRW, kelurahan, kecamatan, kota string) string {
+func buildAlamat(alamat, rt, rw, kelurahan, kecamatan, kota string) string {
 	parts := []string{alamat}
-	if rtRW != "" {
-		parts = append(parts, "RT/RW "+rtRW)
+	if rt != "" || rw != "" {
+		parts = append(parts, "RT "+rt+"/RW "+rw)
 	}
 	if kelurahan != "" {
 		parts = append(parts, "Kel. "+kelurahan)
