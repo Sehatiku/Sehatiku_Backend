@@ -44,6 +44,7 @@ func (r *RouteConfig) SetupFaskesAuthedRoute() {
 	g.GET("/nakes", r.NakesController.ListNakes)
 	g.POST("/nakes/register/ktp-ocr", r.NakesRegistrationController.ScanKTP)
 	g.POST("/nakes/register", r.NakesRegistrationController.RegisterNakes)
+	g.PATCH("/nakes/:id/status", r.NakesController.UpdateStatus)
 }
 
 func (r *RouteConfig) SetupNakesGuestRoute() {

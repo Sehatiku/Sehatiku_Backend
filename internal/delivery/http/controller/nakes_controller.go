@@ -8,12 +8,13 @@ import (
 	"github.com/labstack/echo/v5"
 )
 
-type nakesListUseCase interface {
+type nakesUseCase interface {
 	ListNakes(ctx context.Context, faskesID string) ([]model.NakesListItem, error)
+	UpdateNakesStatus(ctx context.Context, faskesID, nakesID string, req *model.UpdateNakesStatusRequest) (*model.UpdateNakesStatusResponse, error)
 }
 
 type NakesController struct {
-	UseCase nakesListUseCase
+	UseCase nakesUseCase
 }
 
 func (c *NakesController) ListNakes(ctx *echo.Context) error {
@@ -30,5 +31,41 @@ func (c *NakesController) ListNakes(ctx *echo.Context) error {
 	return ctx.JSON(http.StatusOK, model.WebResponse[[]model.NakesListItem]{
 		Message: "daftar nakes berhasil diambil",
 		Data:    items,
+	})
+}
+
+func (c *NakesController) UpdateStatus(ctx *echo.Context) error {
+	claims := getFaskesClaimsFromCtx(ctx)
+
+	nakesID := ctx.Param("id")
+	if nakesID == "" {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
+			Message: "bad request",
+			Errors:  "nakes id wajib diisi",
+		})
+	}
+
+	req := new(model.UpdateNakesStatusRequest)
+	if err := ctx.Bind(req); err != nil {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
+			Message: "bad request",
+			Errors:  err.Error(),
+		})
+	}
+	if err := ctx.Validate(req); err != nil {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
+			Message: "validation error",
+			Errors:  err.Error(),
+		})
+	}
+
+	resp, err := c.UseCase.UpdateNakesStatus(ctx.Request().Context(), claims.FaskesID, nakesID, req)
+	if err != nil {
+		return mapNakesError(ctx, err)
+	}
+
+	return ctx.JSON(http.StatusOK, model.WebResponse[*model.UpdateNakesStatusResponse]{
+		Message: "status nakes berhasil diperbarui",
+		Data:    resp,
 	})
 }
