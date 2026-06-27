@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"sehatiku-backend/internal/helper"
+
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
@@ -79,7 +81,12 @@ func (g *WhatsAppGateway) sendText(ctx context.Context, toPhone, text string) er
 		return fmt.Errorf("whatsapp client not connected")
 	}
 
-	jid := types.NewJID(toPhone, types.DefaultUserServer)
+	phone := helper.NormalizePhoneID(toPhone)
+	if phone == "" {
+		return fmt.Errorf("invalid phone number %q", toPhone)
+	}
+
+	jid := types.NewJID(phone, types.DefaultUserServer)
 
 	_, err := g.Client.SendMessage(ctx, jid, &waE2E.Message{
 		Conversation: proto.String(text),
