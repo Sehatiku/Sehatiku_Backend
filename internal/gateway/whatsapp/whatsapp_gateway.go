@@ -27,7 +27,7 @@ func New(client *whatsmeow.Client, log *zap.Logger) *WhatsAppGateway {
 // Dipanggil secara fire-and-forget dari goroutine — error hanya di-log, tidak dipropagasi.
 func (g *WhatsAppGateway) SendLoginNotification(ctx context.Context, toPhone, recipientName string) error {
 	text := fmt.Sprintf(
-		"[Sehatiku] Halo %s, login ke akun Sehatiku berhasil pada %s. Jika bukan Anda yang login, segera hubungi admin faskes Anda.",
+		"🔐 *Sehatiku — Notifikasi Login*\n\nHalo %s 👋\n\nKami mendeteksi login ke akun Sehatiku Anda pada *%s*.\n\nJika ini Anda, tidak ada tindakan yang diperlukan ✅\nNamun jika Anda *tidak* merasa melakukan login ini, segera hubungi admin faskes Anda untuk mengamankan akun 🚨\n\nTerima kasih telah menjaga kesehatan bersama Sehatiku 💙",
 		recipientName,
 		time.Now().Format("02 Jan 2006 15:04 WIB"),
 	)
@@ -46,7 +46,7 @@ func (g *WhatsAppGateway) SendLoginNotification(ctx context.Context, toPhone, re
 // Dipanggil fire-and-forget — error hanya di-log, tidak dipropagasi.
 func (g *WhatsAppGateway) SendRegistrationCredentials(ctx context.Context, toPhone, recipientName, username, password string) error {
 	text := fmt.Sprintf(
-		"[Sehatiku] Halo %s, akun Sehatiku Anda telah dibuat.\n\nUsername: %s\nPassword: %s\n\nSimpan pesan ini baik-baik dan jangan bagikan kredensial Anda ke siapa pun. Segera ganti password setelah login pertama.",
+		"🎉 *Selamat Datang di Sehatiku!*\n\nHalo %s 👋\n\nAkun Sehatiku Anda telah berhasil dibuat. Berikut kredensial login Anda:\n\n👤 Username: *%s*\n🔑 Password: *%s*\n\n⚠️ *Penting demi keamanan akun Anda:*\n• Simpan pesan ini dengan baik 🗂️\n• Jangan pernah membagikan kredensial ini kepada siapa pun 🤫\n• Segera ganti password setelah login pertama 🔄\n\nSelamat memulai perjalanan sehat Anda bersama kami 💙",
 		recipientName, username, password,
 	)
 
@@ -63,7 +63,7 @@ func (g *WhatsAppGateway) SendRegistrationCredentials(ctx context.Context, toPho
 // lansia mengakses akunnya. Dipanggil fire-and-forget — error hanya di-log.
 func (g *WhatsAppGateway) SendCompanionRegistrationCredentials(ctx context.Context, toPhone, companionName, patientName, username, password string) error {
 	text := fmt.Sprintf(
-		"[Sehatiku] Halo %s, %s telah didaftarkan di Sehatiku. Mohon bantu %s untuk login dan mencatat data kesehatannya.\n\nUsername: %s\nPassword: %s\n\nJaga kerahasiaan kredensial ini dan jangan bagikan ke pihak lain.",
+		"🤝 *Sehatiku — Informasi Akun Pasien*\n\nHalo %s 👋\n\n%s telah berhasil didaftarkan di Sehatiku. Sebagai pendamping, kami mohon bantuan Anda untuk mendampingi *%s* login dan mencatat data kesehatannya setiap hari 📋\n\nBerikut kredensial login pasien:\n\n👤 Username: *%s*\n🔑 Password: *%s*\n\n⚠️ Mohon jaga kerahasiaan kredensial ini dan jangan membagikannya kepada pihak lain 🔒\n\nTerima kasih atas kepedulian Anda 💙",
 		companionName, patientName, patientName, username, password,
 	)
 
