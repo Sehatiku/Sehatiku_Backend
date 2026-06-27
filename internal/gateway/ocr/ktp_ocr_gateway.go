@@ -9,7 +9,9 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -46,8 +48,10 @@ type KTPOCRResult struct {
 	TempatLahir      string `json:"tempat_lahir"`
 	TanggalLahir     string `json:"tanggal_lahir"`
 	JenisKelamin     string `json:"jenis_kelamin"`
+	GolonganDarah    string `json:"golongan_darah"`
 	Alamat           string `json:"alamat"`
-	RTRW             string `json:"rt_rw"`
+	RT               string `json:"rt"`
+	RW               string `json:"rw"`
 	Kelurahan        string `json:"kelurahan"`
 	Kecamatan        string `json:"kecamatan"`
 	Kota             string `json:"kota"`
@@ -66,15 +70,30 @@ type ocrAPIResponse struct {
 }
 
 func (g *KTPOCRGateway) ExtractKTP(ctx context.Context, file multipart.File, filename string) (*KTPOCRResult, error) {
+	// Read the whole upload so we can detect its real MIME type. The upstream
+	// OCR pipeline routes on the multipart part's Content-Type, so we must send
+	// image/jpeg or image/png exactly like the documented curl example does.
+	// multipart.CreateFormFile hardcodes application/octet-stream, which the
+	// extractor treats as "not an image" and rejects (422 / "Card Pattern Not
+	// Detected"). See https://pkg.go.dev/mime/multipart#Writer.CreateFormFile
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("reading upload: %w", err)
+	}
+	contentType := http.DetectContentType(fileBytes)
+
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 
-	part, err := writer.CreateFormFile("file", filepath.Base(filename))
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename=%q`, filepath.Base(filename)))
+	h.Set("Content-Type", contentType)
+	part, err := writer.CreatePart(h)
 	if err != nil {
 		return nil, fmt.Errorf("creating form file: %w", err)
 	}
-	if _, err = io.Copy(part, file); err != nil {
-		return nil, fmt.Errorf("copying file to form: %w", err)
+	if _, err = part.Write(fileBytes); err != nil {
+		return nil, fmt.Errorf("writing file to form: %w", err)
 	}
 	writer.Close()
 
@@ -101,11 +120,18 @@ func (g *KTPOCRGateway) ExtractKTP(ctx context.Context, file multipart.File, fil
 	case http.StatusOK:
 		// handled below
 	case http.StatusUnprocessableEntity:
+		g.Log.Warn("OCR upstream: KTP unreadable", zap.String("content_type", contentType), zap.String("body", string(body)))
 		return nil, ErrOCRKTPUnreadable
 	case http.StatusBadRequest:
+		g.Log.Warn("OCR upstream: bad request", zap.String("content_type", contentType), zap.String("body", string(body)))
+		var errResp ocrAPIResponse
+		if json.Unmarshal(body, &errResp) == nil && strings.Contains(errResp.Message, "Card Pattern Not Detected") {
+			// api.co.id returns 400 for this but semantically it means KTP unreadable
+			return nil, ErrOCRKTPUnreadable
+		}
 		return nil, ErrOCRBadRequest
 	case http.StatusUnauthorized:
-		g.Log.Error("OCR API key rejected by upstream")
+		g.Log.Error("OCR API key rejected by upstream", zap.String("body", string(body)))
 		return nil, ErrOCRUnauthorized
 	default:
 		g.Log.Warn("unexpected OCR API status", zap.Int("status", resp.StatusCode), zap.String("body", string(body)))
@@ -117,6 +143,7 @@ func (g *KTPOCRGateway) ExtractKTP(ctx context.Context, file multipart.File, fil
 		return nil, fmt.Errorf("parsing OCR response: %w", err)
 	}
 	if !apiResp.IsSuccess || apiResp.Data == nil {
+		g.Log.Warn("OCR upstream: 200 but no data", zap.String("body", string(body)))
 		return nil, ErrOCRKTPUnreadable
 	}
 
