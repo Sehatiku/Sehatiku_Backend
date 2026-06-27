@@ -60,7 +60,8 @@ func mapRegistrationError(ctx *echo.Context, err error) error {
 			Message: "unprocessable entity",
 			Errors:  err.Error(),
 		})
-	case errors.Is(err, ocr.ErrOCRBadRequest):
+	case errors.Is(err, ocr.ErrOCRBadRequest),
+		errors.Is(err, usecase.ErrAssignedNakesInvalid):
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
 			Message: "bad request",
 			Errors:  err.Error(),
