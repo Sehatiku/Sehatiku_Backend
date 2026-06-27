@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -52,6 +53,13 @@ func SetUpWhatsApp(_ *viper.Viper, log *zap.Logger, db *gorm.DB) *whatsapp.Whats
 	client := whatsmeow.NewClient(deviceStore, waLogger)
 	client.EnableAutoReconnect = true
 
+	// Daftarkan event handler SEBELUM Connect supaya tidak ada event awal yang terlewat.
+	// Handler ini murni observasi (logging) — tidak mengubah keputusan reconnect. Tujuannya
+	// memberi visibilitas kapan & kenapa sesi WA hilang: `StreamReplaced` menandakan koneksi
+	// ganda (mis. dua instance saat redeploy), sedangkan `LoggedOut` adalah momen whatsmeow
+	// menghapus baris device dari store (unlink HP / HP offline >14 hari / ban).
+	registerWhatsAppEventLogging(client, log.Named("whatsmeow-events"))
+
 	if client.Store.ID == nil {
 		log.Warn("whatsapp client not paired — run 'go run ./cmd/wa-setup' to scan QR and pair")
 	} else {
@@ -63,4 +71,31 @@ func SetUpWhatsApp(_ *viper.Viper, log *zap.Logger, db *gorm.DB) *whatsapp.Whats
 	}
 
 	return whatsapp.New(client, log)
+}
+
+// registerWhatsAppEventLogging memasang handler yang mencatat event lifecycle koneksi WA.
+// Level log dipilih supaya penyebab "device hilang" langsung terlihat di log (mis. Railway):
+// StreamReplaced/LoggedOut di-log keras karena itulah jejak koneksi ganda & pencabutan sesi.
+func registerWhatsAppEventLogging(client *whatsmeow.Client, log *zap.Logger) {
+	client.AddEventHandler(func(evt any) {
+		switch e := evt.(type) {
+		case *events.Connected:
+			log.Info("whatsapp connected")
+		case *events.Disconnected:
+			log.Warn("whatsapp disconnected (websocket ditutup server)")
+		case *events.StreamReplaced:
+			log.Warn("whatsapp stream replaced — koneksi digantikan client lain dengan kunci yang sama; " +
+				"indikasi koneksi ganda (mis. dua instance saat redeploy / wa-setup dijalankan saat server hidup)")
+		case *events.LoggedOut:
+			log.Error("whatsapp logged out — sesi device dihapus dari store, perlu scan QR ulang",
+				zap.Bool("on_connect", e.OnConnect),
+				zap.String("reason", e.Reason.String()),
+				zap.String("reason_code", e.Reason.NumberString()),
+			)
+		case *events.PairSuccess:
+			log.Info("whatsapp pairing berhasil", zap.String("jid", e.ID.String()))
+		case *events.TemporaryBan:
+			log.Error("whatsapp temporary ban", zap.String("ban", e.String()), zap.Duration("expire", e.Expire))
+		}
+	})
 }
