@@ -8,3 +8,11 @@ import (
 func NewValidator(viper *viper.Viper) *validator.Validate {
 	return validator.New()
 }
+
+type CustomValidator struct {
+	validator *validator.Validate
+}
+
+func (cv *CustomValidator) Validate(i any) error {
+	return cv.validator.Struct(i)
+}

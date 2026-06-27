@@ -116,6 +116,8 @@ func BootStrap(config *BootStrapConfig) {
 		QueueUseCase:   dashboardUC,
 	}
 
+	config.App.Validator = &CustomValidator{validator: config.Validate}
+
 	routeConfig := routing.RouteConfig{
 		App:                           config.App,
 		JWTHelper:                     config.JWT,
