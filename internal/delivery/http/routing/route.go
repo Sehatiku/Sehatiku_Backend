@@ -18,6 +18,7 @@ type RouteConfig struct {
 	TokenController               *controller.TokenController
 	NakesRegistrationController   *controller.NakesRegistrationController
 	NakesController               *controller.NakesController
+	PatientController             *controller.PatientController
 	PatientRegistrationController *controller.PatientRegistrationController
 	DashboardController           *controller.DashboardController
 	PatientDashboardController    *controller.PatientDashboardController
@@ -45,6 +46,7 @@ func (r *RouteConfig) SetupFaskesAuthedRoute() {
 	g.POST("/nakes/register/ktp-ocr", r.NakesRegistrationController.ScanKTP)
 	g.POST("/nakes/register", r.NakesRegistrationController.RegisterNakes)
 	g.PATCH("/nakes/:id/status", r.NakesController.UpdateStatus)
+	g.GET("/patients", r.PatientController.ListPatients)
 }
 
 func (r *RouteConfig) SetupNakesGuestRoute() {

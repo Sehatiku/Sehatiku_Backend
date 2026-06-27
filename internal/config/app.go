@@ -91,6 +91,11 @@ func BootStrap(config *BootStrapConfig) {
 		NakesRepo: nakesRepo,
 		Log:       config.Log,
 	}
+	patientUC := &usecase.PatientUseCase{
+		DB:          config.DB,
+		PatientRepo: patientRepo,
+		Log:         config.Log,
+	}
 	patientRegUC := &usecase.PatientRegistrationUseCase{
 		DB:          config.DB,
 		PatientRepo: patientRepo,
@@ -119,6 +124,7 @@ func BootStrap(config *BootStrapConfig) {
 	tokenCtrl := &controller.TokenController{UseCase: tokenUC}
 	nakesRegCtrl := &controller.NakesRegistrationController{UseCase: nakesRegUC}
 	nakesCtrl := &controller.NakesController{UseCase: nakesUC}
+	patientCtrl := &controller.PatientController{UseCase: patientUC}
 	patientRegCtrl := &controller.PatientRegistrationController{UseCase: patientRegUC}
 	dashboardCtrl := &controller.DashboardController{
 		SummaryUseCase: dashboardUC,
@@ -137,6 +143,7 @@ func BootStrap(config *BootStrapConfig) {
 		TokenController:               tokenCtrl,
 		NakesRegistrationController:   nakesRegCtrl,
 		NakesController:               nakesCtrl,
+		PatientController:             patientCtrl,
 		PatientRegistrationController: patientRegCtrl,
 		DashboardController:           dashboardCtrl,
 		PatientDashboardController:    patientDashboardCtrl,
