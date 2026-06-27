@@ -1,6 +1,11 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 type Patient struct {
 	ID              string    `gorm:"column:id;primaryKey"`
@@ -25,4 +30,11 @@ type Patient struct {
 
 func (Patient) TableName() string {
 	return "patients"
+}
+
+func (p *Patient) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == "" {
+		p.ID = uuid.New().String()
+	}
+	return nil
 }

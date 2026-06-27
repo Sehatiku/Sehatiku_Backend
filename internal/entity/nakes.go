@@ -1,6 +1,11 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 type Nakes struct {
 	ID           string    `gorm:"column:id;primaryKey"`
@@ -20,4 +25,11 @@ type Nakes struct {
 
 func (Nakes) TableName() string {
 	return "nakes"
+}
+
+func (n *Nakes) BeforeCreate(tx *gorm.DB) error {
+	if n.ID == "" {
+		n.ID = uuid.New().String()
+	}
+	return nil
 }
