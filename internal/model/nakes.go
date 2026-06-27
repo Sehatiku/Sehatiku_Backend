@@ -44,3 +44,15 @@ type NakesListItem struct {
 	Status      string    `json:"status"`
 	EnrolledAt  time.Time `json:"enrolled_at"`
 }
+
+// ── Nakes Status Update ──────────────────────────────────────────────────────
+
+type UpdateNakesStatusRequest struct {
+	Status string `json:"status" validate:"required,oneof=active inactive"`
+}
+
+type UpdateNakesStatusResponse struct {
+	NakesID  string `json:"nakes_id"`
+	FullName string `json:"full_name"`
+	Status   string `json:"status"`
+}

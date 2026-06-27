@@ -73,7 +73,7 @@ func (u *NakesRegistrationUseCase) RegisterNakes(ctx context.Context, faskesID s
 		NIK:          req.NIK,
 		Alamat:       req.Alamat,
 		PhoneNumber:  req.PhoneNumber,
-		Status:       "active",
+		Status:       entity.NakesStatusActive,
 		EnrolledAt:   now,
 	}
 

@@ -7,6 +7,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	NakesStatusActive   = "active"
+	NakesStatusInactive = "inactive"
+)
+
 type Nakes struct {
 	ID           string    `gorm:"column:id;primaryKey"`
 	FaskesID     string    `gorm:"column:faskes_id"`
