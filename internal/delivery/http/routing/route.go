@@ -17,6 +17,7 @@ type RouteConfig struct {
 	PatientAuthController         *controller.PatientAuthController
 	TokenController               *controller.TokenController
 	NakesRegistrationController   *controller.NakesRegistrationController
+	NakesController               *controller.NakesController
 	PatientRegistrationController *controller.PatientRegistrationController
 }
 
@@ -37,6 +38,7 @@ func (r *RouteConfig) SetupFaskesGuestRoute() {
 
 func (r *RouteConfig) SetupFaskesAuthedRoute() {
 	g := r.App.Group("/api/v1/faskes", middleware.FaskesAuth(r.JWTHelper))
+	g.GET("/nakes", r.NakesController.ListNakes)
 	g.POST("/nakes/register/ktp-ocr", r.NakesRegistrationController.ScanKTP)
 	g.POST("/nakes/register", r.NakesRegistrationController.RegisterNakes)
 }

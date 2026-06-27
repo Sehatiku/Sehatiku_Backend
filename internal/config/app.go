@@ -85,6 +85,11 @@ func BootStrap(config *BootStrapConfig) {
 		OCRGateway: ktpOCRGateway,
 		Log:        config.Log,
 	}
+	nakesUC := &usecase.NakesUseCase{
+		DB:        config.DB,
+		NakesRepo: nakesRepo,
+		Log:       config.Log,
+	}
 	patientRegUC := &usecase.PatientRegistrationUseCase{
 		DB:          config.DB,
 		PatientRepo: patientRepo,
@@ -98,17 +103,19 @@ func BootStrap(config *BootStrapConfig) {
 	patientAuthCtrl := &controller.PatientAuthController{UseCase: patientAuthUC}
 	tokenCtrl := &controller.TokenController{UseCase: tokenUC}
 	nakesRegCtrl := &controller.NakesRegistrationController{UseCase: nakesRegUC}
+	nakesCtrl := &controller.NakesController{UseCase: nakesUC}
 	patientRegCtrl := &controller.PatientRegistrationController{UseCase: patientRegUC}
 
 	routeConfig := routing.RouteConfig{
-		App:                            config.App,
-		JWTHelper:                      config.JWT,
-		FaskesAuthController:           faskesAuthCtrl,
-		NakesAuthController:            nakesAuthCtrl,
-		PatientAuthController:          patientAuthCtrl,
-		TokenController:                tokenCtrl,
-		NakesRegistrationController:    nakesRegCtrl,
-		PatientRegistrationController:  patientRegCtrl,
+		App:                           config.App,
+		JWTHelper:                     config.JWT,
+		FaskesAuthController:          faskesAuthCtrl,
+		NakesAuthController:           nakesAuthCtrl,
+		PatientAuthController:         patientAuthCtrl,
+		TokenController:               tokenCtrl,
+		NakesRegistrationController:   nakesRegCtrl,
+		NakesController:               nakesCtrl,
+		PatientRegistrationController: patientRegCtrl,
 	}
 	routeConfig.SetUp()
 }
