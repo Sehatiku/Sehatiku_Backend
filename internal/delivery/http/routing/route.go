@@ -13,6 +13,7 @@ type RouteConfig struct {
 	JWTHelper *helper.JWTHelper
 
 	FaskesAuthController          *controller.FaskesAuthController
+	FaskesController              *controller.FaskesController
 	NakesAuthController           *controller.NakesAuthController
 	PatientAuthController         *controller.PatientAuthController
 	TokenController               *controller.TokenController
@@ -22,6 +23,7 @@ type RouteConfig struct {
 	PatientRegistrationController *controller.PatientRegistrationController
 	DashboardController           *controller.DashboardController
 	PatientDashboardController    *controller.PatientDashboardController
+	HealthLogController           *controller.HealthLogController
 }
 
 func (r *RouteConfig) SetUp() {
@@ -42,7 +44,9 @@ func (r *RouteConfig) SetupFaskesGuestRoute() {
 
 func (r *RouteConfig) SetupFaskesAuthedRoute() {
 	g := r.App.Group("/api/v1/faskes", middleware.FaskesAuth(r.JWTHelper))
+	g.GET("/profile", r.FaskesController.GetProfile)
 	g.GET("/nakes", r.NakesController.ListNakes)
+	g.GET("/nakes/:id", r.NakesController.GetNakesDetail)
 	g.POST("/nakes/register/ktp-ocr", r.NakesRegistrationController.ScanKTP)
 	g.POST("/nakes/register", r.NakesRegistrationController.RegisterNakes)
 	g.PATCH("/nakes/:id/status", r.NakesController.UpdateStatus)
@@ -71,6 +75,7 @@ func (r *RouteConfig) SetupPatientGuestRoute() {
 func (r *RouteConfig) SetupPatientAuthedRoute() {
 	g := r.App.Group("/api/v1/patients", middleware.PatientAuth(r.JWTHelper))
 	g.GET("/dashboard", r.PatientDashboardController.GetDashboard)
+	g.POST("/health-logs", r.HealthLogController.Create)
 }
 
 func (r *RouteConfig) SetupTokenRoute() {

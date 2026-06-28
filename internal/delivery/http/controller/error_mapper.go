@@ -32,6 +32,21 @@ func mapAuthError(ctx *echo.Context, err error) error {
 	}
 }
 
+func mapFaskesError(ctx *echo.Context, err error) error {
+	switch {
+	case errors.Is(err, usecase.ErrFaskesNotFound):
+		return ctx.JSON(http.StatusNotFound, model.WebResponse[any]{
+			Message: "not found",
+			Errors:  err.Error(),
+		})
+	default:
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
+			Message: "internal server error",
+			Errors:  err.Error(),
+		})
+	}
+}
+
 func mapNakesError(ctx *echo.Context, err error) error {
 	switch {
 	case errors.Is(err, usecase.ErrNakesNotFound):
@@ -52,6 +67,31 @@ func mapPatientError(ctx *echo.Context, err error) error {
 	case errors.Is(err, usecase.ErrPatientNotFound):
 		return ctx.JSON(http.StatusNotFound, model.WebResponse[any]{
 			Message: "not found",
+			Errors:  err.Error(),
+		})
+	default:
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
+			Message: "internal server error",
+			Errors:  err.Error(),
+		})
+	}
+}
+
+func mapHealthLogError(ctx *echo.Context, err error) error {
+	switch {
+	case errors.Is(err, usecase.ErrInvalidHealthLog):
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
+			Message: "bad request",
+			Errors:  err.Error(),
+		})
+	case errors.Is(err, usecase.ErrIdempotencyInFlight):
+		return ctx.JSON(http.StatusConflict, model.WebResponse[any]{
+			Message: "conflict",
+			Errors:  err.Error(),
+		})
+	case errors.Is(err, usecase.ErrTooManySubmissions):
+		return ctx.JSON(http.StatusTooManyRequests, model.WebResponse[any]{
+			Message: "too many requests",
 			Errors:  err.Error(),
 		})
 	default:
