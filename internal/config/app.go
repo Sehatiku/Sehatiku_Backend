@@ -33,6 +33,7 @@ func BootStrap(config *BootStrapConfig) {
 	faskesRepo := &repository.FaskesRepository{}
 	nakesRepo := &repository.NakesRepository{}
 	patientRepo := &repository.PatientRepository{}
+	notificationRepo := &repository.NotificationRepository{}
 	sessionRepo := &repository.SessionRepository{
 		Redis: config.Redis,
 		Log:   config.Log,
@@ -103,12 +104,13 @@ func BootStrap(config *BootStrapConfig) {
 		Log:         config.Log,
 	}
 	patientRegUC := &usecase.PatientRegistrationUseCase{
-		DB:          config.DB,
-		PatientRepo: patientRepo,
-		NakesRepo:   nakesRepo,
-		OCRGateway:  ktpOCRGateway,
-		WhatsApp:    config.WhatsApp,
-		Log:         config.Log,
+		DB:               config.DB,
+		PatientRepo:      patientRepo,
+		NakesRepo:        nakesRepo,
+		NotificationRepo: notificationRepo,
+		OCRGateway:       ktpOCRGateway,
+		WhatsApp:         config.WhatsApp,
+		Log:              config.Log,
 	}
 	dashboardRepo := &repository.DashboardRepository{}
 	dashboardUC := &usecase.DashboardUseCase{
