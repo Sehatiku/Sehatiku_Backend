@@ -14,6 +14,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// waConnectWaitTimeout adalah batas waktu menunggu socket WA pulih sebelum sebuah
+// pengiriman pesan menyerah. Dengan EnableAutoReconnect aktif, koneksi yang putus
+// sementara (mis. server WhatsApp menutup websocket lalu client reconnect) biasanya
+// pulih dalam hitungan detik. Tanpa menunggu, pesan fire-and-forget akan langsung
+// hilang setiap kali kebetulan dikirim di celah reconnect tersebut.
+const waConnectWaitTimeout = 30 * time.Second
+
 type WhatsAppGateway struct {
 	Client *whatsmeow.Client
 	Log    *zap.Logger
@@ -77,8 +84,25 @@ func (g *WhatsAppGateway) SendCompanionRegistrationCredentials(ctx context.Conte
 
 // sendText adalah helper internal untuk mengirim pesan teks biasa ke satu nomor WA.
 func (g *WhatsAppGateway) sendText(ctx context.Context, toPhone, text string) error {
-	if g.Client == nil || !g.Client.IsConnected() {
-		return fmt.Errorf("whatsapp client not connected")
+	if g.Client == nil {
+		return fmt.Errorf("whatsapp client not initialised")
+	}
+
+	// Bedakan "belum pernah dipasangkan" dari "putus sementara": kalau tidak ada sesi
+	// di store (Store.ID == nil), tidak ada gunanya menunggu — device harus scan QR
+	// dulu via cmd/wa-setup. Pesan error ini sengaja eksplisit supaya log langsung
+	// menunjukkan akar masalahnya, bukan sekadar "not connected".
+	if g.Client.Store.ID == nil {
+		return fmt.Errorf("whatsapp client not paired (jalankan cmd/wa-setup untuk scan QR)")
+	}
+
+	// Device terpasang tapi socket sedang tidak terhubung — kemungkinan besar sedang
+	// reconnect. Tunggu sampai koneksi pulih (atau timeout) sebelum menyerah, supaya
+	// kredensial tidak hilang hanya karena kebetulan dikirim di celah reconnect.
+	if !g.Client.IsConnected() {
+		if !g.Client.WaitForConnection(waConnectWaitTimeout) {
+			return fmt.Errorf("whatsapp client not connected (timeout %s menunggu reconnect)", waConnectWaitTimeout)
+		}
 	}
 
 	phone := helper.NormalizePhoneID(toPhone)

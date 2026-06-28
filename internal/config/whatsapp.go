@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"time"
 
 	"sehatiku-backend/internal/gateway/whatsapp"
 
@@ -63,10 +64,16 @@ func SetUpWhatsApp(_ *viper.Viper, log *zap.Logger, db *gorm.DB) *whatsapp.Whats
 	if client.Store.ID == nil {
 		log.Warn("whatsapp client not paired — run 'go run ./cmd/wa-setup' to scan QR and pair")
 	} else {
+		// Connect() bersifat asinkron: ia hanya memulai handshake websocket lalu kembali.
+		// Tunggu sampai koneksi benar-benar terhubung+login agar log startup jujur dan agar
+		// request pertama tidak datang sebelum socket siap. Kalau belum pulih dalam timeout,
+		// auto-reconnect tetap akan mencoba di belakang layar.
 		if connErr := client.Connect(); connErr != nil {
 			log.Error("whatsapp: failed to connect", zap.Error(connErr))
-		} else {
+		} else if client.WaitForConnection(30 * time.Second) {
 			log.Info("whatsapp client connected")
+		} else {
+			log.Warn("whatsapp: belum terhubung dalam 30s setelah connect — akan dicoba ulang via auto-reconnect")
 		}
 	}
 
