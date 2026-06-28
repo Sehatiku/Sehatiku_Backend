@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sehatiku-backend/internal/entity"
-	"sehatiku-backend/internal/gateway/whatsapp"
 	"sehatiku-backend/internal/helper"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/repository"
@@ -16,8 +15,8 @@ import (
 )
 
 var (
-	ErrInvalidCredentials   = errors.New("username atau password salah")
-	ErrAccountInactive      = errors.New("akun tidak aktif")
+	ErrInvalidCredentials    = errors.New("username atau password salah")
+	ErrAccountInactive       = errors.New("akun tidak aktif")
 	ErrUsernameAlreadyExists = errors.New("username sudah digunakan")
 )
 
@@ -26,7 +25,6 @@ type FaskesAuthUseCase struct {
 	FaskesRepo  *repository.FaskesRepository
 	SessionRepo *repository.SessionRepository
 	JWT         *helper.JWTHelper
-	WhatsApp    *whatsapp.WhatsAppGateway
 	Log         *zap.Logger
 }
 

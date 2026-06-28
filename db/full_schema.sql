@@ -1,13 +1,13 @@
 -- full_schema.sql
 -- Sehatiku MVP — schema lengkap untuk bootstrap database baru.
 --
--- File ini adalah konsolidasi dari migration 000001-000007.
+-- File ini adalah konsolidasi dari migration 000001-000008.
 -- Untuk development/staging: jalankan langsung via psql.
 -- Untuk production: tetap gunakan golang-migrate dengan file bernomor di db/migration/.
 --
 -- Urutan: extensions → enums → faskes → nakes → patients → baselines
 --         → health_logs → lab_results → model_versions → daily_features
---         → risk_scores → escalations → notifications
+--         → risk_scores → escalations → notifications → consultations
 
 BEGIN;
 
@@ -32,7 +32,8 @@ CREATE TYPE disease_type   AS ENUM ('diabetes_t2', 'hypertension', 'both');
 CREATE TYPE health_logger  AS ENUM ('patient', 'companion');
 CREATE TYPE health_metric  AS ENUM (
     'glucose', 'bp', 'med_adherence', 'food',
-    'activity', 'sleep', 'stress', 'smoking', 'alcohol'
+    'activity', 'sleep', 'stress', 'smoking', 'alcohol',
+    'weight'
 );
 CREATE TYPE log_source     AS ENUM ('whatsapp', 'sms', 'web', 'app');
 CREATE TYPE lab_type       AS ENUM (
@@ -81,19 +82,22 @@ CREATE TABLE faskes (
 CREATE UNIQUE INDEX idx_faskes_username ON faskes(username);
 
 CREATE TABLE nakes (
-    id            UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-    faskes_id     UUID          NOT NULL REFERENCES faskes(id) ON DELETE RESTRICT,
-    username      TEXT          NOT NULL,
-    password_hash TEXT          NOT NULL,
-    full_name     TEXT          NOT NULL,
-    role          nakes_role    NOT NULL DEFAULT 'dokter',
-    nik           TEXT          NOT NULL,
-    alamat        TEXT          NOT NULL,
-    phone_number  TEXT          NOT NULL,
-    status        entity_status NOT NULL DEFAULT 'active',
-    enrolled_at   TIMESTAMPTZ   NOT NULL DEFAULT now(),
-    created_at    TIMESTAMPTZ   NOT NULL DEFAULT now(),
-    updated_at    TIMESTAMPTZ   NOT NULL DEFAULT now()
+    id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    faskes_id       UUID          NOT NULL REFERENCES faskes(id) ON DELETE RESTRICT,
+    username        TEXT          NOT NULL,
+    password_hash   TEXT          NOT NULL,
+    full_name       TEXT          NOT NULL,
+    role            nakes_role    NOT NULL DEFAULT 'dokter',
+    nik             TEXT          NOT NULL,
+    alamat          TEXT          NOT NULL,
+    phone_number    TEXT          NOT NULL,
+    status          entity_status NOT NULL DEFAULT 'active',
+    specialization  TEXT,
+    hospital        TEXT,
+    schedule        JSONB,
+    enrolled_at     TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    created_at      TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ   NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX idx_nakes_username ON nakes(username);
 CREATE INDEX        idx_nakes_faskes   ON nakes(faskes_id);
@@ -303,5 +307,18 @@ CREATE TABLE notifications (
 CREATE INDEX idx_notifications_retry   ON notifications(status, retry_count) WHERE status = 'failed';
 CREATE INDEX idx_notifications_patient ON notifications(patient_id);
 CREATE INDEX idx_notifications_nakes   ON notifications(nakes_id);
+
+-- =============================================================================
+-- CONSULTATIONS: keluhan pasien ke dokter penanggung jawab
+-- =============================================================================
+
+CREATE TABLE consultations (
+    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id  UUID        NOT NULL REFERENCES patients(id),
+    complaint   TEXT        NOT NULL,
+    status      VARCHAR(20) NOT NULL DEFAULT 'open',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_consultations_patient ON consultations(patient_id, created_at DESC);
 
 COMMIT;

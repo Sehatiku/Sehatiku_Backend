@@ -4,6 +4,9 @@
 
 BEGIN;
 
+-- Consultations
+DROP TABLE IF EXISTS consultations CASCADE;
+
 -- Aksi & komunikasi
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS escalations   CASCADE;
