@@ -98,7 +98,7 @@ func (u *NakesRegistrationUseCase) RegisterNakes(ctx context.Context, faskesID s
 		warmup.Status = warmupStatusUnavailable
 	}
 	warmup.NakesLink = u.prepareWarmup(ctx, nakes.ID, nakes.PhoneNumber, nakes.FullName, nakes.Username, req.Password, botPhone)
-	warmup.NakesMessage = helper.BuildWarmupShareMessage(
+	warmup.NakesDirectLink = helper.BuildDirectInviteLink(nakes.PhoneNumber,
 		entity.RecipientRoleNakes, nakes.FullName, "", nakes.Username, warmup.NakesLink)
 
 	return &model.NakesRegisterResponse{

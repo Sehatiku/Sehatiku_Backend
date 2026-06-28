@@ -154,13 +154,13 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 
 	warmup.PatientLink = u.prepareWarmup(ctx, patient.ID, patient.PhoneNumber,
 		entity.RecipientRolePatient, patient.FullName, "", patient.Username, req.Password, botPhone)
-	warmup.PatientMessage = helper.BuildWarmupShareMessage(
+	warmup.PatientDirectLink = helper.BuildDirectInviteLink(patient.PhoneNumber,
 		entity.RecipientRolePatient, patient.FullName, "", patient.Username, warmup.PatientLink)
 
 	if patient.CompanionPhone != "" {
 		warmup.CompanionLink = u.prepareWarmup(ctx, patient.ID, patient.CompanionPhone,
 			entity.RecipientRoleCompanion, patient.CompanionName, patient.FullName, patient.Username, req.Password, botPhone)
-		warmup.CompanionMessage = helper.BuildWarmupShareMessage(
+		warmup.CompanionDirectLink = helper.BuildDirectInviteLink(patient.CompanionPhone,
 			entity.RecipientRoleCompanion, patient.CompanionName, patient.FullName, patient.Username, warmup.CompanionLink)
 	}
 
