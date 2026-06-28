@@ -61,7 +61,6 @@ func BootStrap(config *BootStrapConfig) {
 		FaskesRepo:  faskesRepo,
 		SessionRepo: sessionRepo,
 		JWT:         config.JWT,
-		WhatsApp:    config.WhatsApp,
 		Log:         config.Log,
 	}
 	nakesAuthUC := &usecase.NakesAuthUseCase{
@@ -69,7 +68,6 @@ func BootStrap(config *BootStrapConfig) {
 		NakesRepo:   nakesRepo,
 		SessionRepo: sessionRepo,
 		JWT:         config.JWT,
-		WhatsApp:    config.WhatsApp,
 		Log:         config.Log,
 	}
 	patientAuthUC := &usecase.PatientAuthUseCase{
@@ -77,7 +75,6 @@ func BootStrap(config *BootStrapConfig) {
 		PatientRepo: patientRepo,
 		SessionRepo: sessionRepo,
 		JWT:         config.JWT,
-		WhatsApp:    config.WhatsApp,
 		Log:         config.Log,
 	}
 	tokenUC := &usecase.TokenUseCase{

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sehatiku-backend/internal/gateway/whatsapp"
 	"sehatiku-backend/internal/helper"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/repository"
@@ -19,7 +18,6 @@ type PatientAuthUseCase struct {
 	PatientRepo *repository.PatientRepository
 	SessionRepo *repository.SessionRepository
 	JWT         *helper.JWTHelper
-	WhatsApp    *whatsapp.WhatsAppGateway
 	Log         *zap.Logger
 }
 

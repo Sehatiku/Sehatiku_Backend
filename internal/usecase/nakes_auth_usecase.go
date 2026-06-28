@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sehatiku-backend/internal/gateway/whatsapp"
 	"sehatiku-backend/internal/helper"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/repository"
@@ -14,13 +13,11 @@ import (
 	"gorm.io/gorm"
 )
 
-
 type NakesAuthUseCase struct {
 	DB          *gorm.DB
 	NakesRepo   *repository.NakesRepository
 	SessionRepo *repository.SessionRepository
 	JWT         *helper.JWTHelper
-	WhatsApp    *whatsapp.WhatsAppGateway
 	Log         *zap.Logger
 }
 
