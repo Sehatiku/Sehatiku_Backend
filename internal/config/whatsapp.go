@@ -103,6 +103,16 @@ func registerWhatsAppEventLogging(client *whatsmeow.Client, log *zap.Logger) {
 			log.Info("whatsapp pairing berhasil", zap.String("jid", e.ID.String()))
 		case *events.TemporaryBan:
 			log.Error("whatsapp temporary ban", zap.String("ban", e.String()), zap.Duration("expire", e.Expire))
+		case *events.NotifyAccountReachoutTimelock:
+			// Inilah sumber error 463 (NackCallerReachoutTimelocked): WhatsApp me-_time-lock_
+			// akun dari mengirim ke kontak dingin. Di-log keras dengan jendela enforcement
+			// supaya jelas kapan pembatasan berakhir — alur warm-up (penerima chat duluan)
+			// adalah cara menghindarinya, bukan menunggu lock ini lepas.
+			log.Warn("whatsapp account reachout time-lock (sumber error 463 untuk kontak baru)",
+				zap.String("enforcement_type", e.EnforcementType),
+				zap.Bool("is_active", e.IsActive),
+				zap.Time("time_enforcement_ends", e.TimeEnforcementEnds.Time),
+			)
 		}
 	})
 }

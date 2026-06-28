@@ -32,6 +32,19 @@ type Notification struct {
 	UpdatedAt         time.Time  `gorm:"column:updated_at"`
 }
 
+// Konstanta nilai kolom notifications — hindari magic string tersebar (be_implementation §3).
+const (
+	NotificationStatusQueued = "queued"
+	NotificationStatusSent   = "sent"
+	NotificationStatusFailed = "failed"
+
+	MessageTypeCredentialBlast = "credential_blast"
+
+	RecipientRolePatient   = "patient"
+	RecipientRoleCompanion = "companion"
+	RecipientRoleNakes     = "nakes"
+)
+
 func (Notification) TableName() string {
 	return "notifications"
 }

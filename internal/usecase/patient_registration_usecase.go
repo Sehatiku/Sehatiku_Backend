@@ -9,7 +9,9 @@ import (
 	"sehatiku-backend/internal/entity"
 	"sehatiku-backend/internal/gateway/ocr"
 	"sehatiku-backend/internal/gateway/whatsapp"
+	"sehatiku-backend/internal/helper"
 	"sehatiku-backend/internal/model"
+	"sehatiku-backend/internal/repository"
 	"time"
 
 	"go.uber.org/zap"
@@ -17,23 +19,35 @@ import (
 	"gorm.io/gorm"
 )
 
-// waSendTimeout membatasi berapa lama registrasi menunggu satu pengiriman kredensial WA
-// sebelum dianggap gagal. Cukup pendek supaya response registrasi tidak menggantung saat
-// WhatsApp putus, tapi cukup longgar untuk pengiriman normal saat koneksi sehat.
-const waSendTimeout = 15 * time.Second
+// waWarmupPrefillText adalah teks yang sudah terisi di chat penerima saat membuka link
+// wa.me. Penerima cukup mengirimnya untuk "menghangatkan" kontak; isi pesan tidak dipakai
+// untuk pencocokan (warm-up dicocokkan berdasarkan nomor pengirim).
+const waWarmupPrefillText = "HALO SEHATIKU, saya ingin menerima detail akun saya."
+
+// warmupStatusPending / warmupStatusUnavailable adalah nilai field wa_warmup.status.
+const (
+	warmupStatusPending     = "pending"
+	warmupStatusUnavailable = "unavailable"
+)
 
 // ErrAssignedNakesInvalid dikembalikan bila assigned_nakes_id pada request tidak
 // merujuk ke nakes mana pun, atau merujuk ke nakes milik faskes lain (isolasi tenant).
 var ErrAssignedNakesInvalid = errors.New("assigned_nakes_id tidak valid atau bukan milik faskes ini")
 
 type PatientRegistrationUseCase struct {
-	DB               *gorm.DB
-	PatientRepo      patientRepo
-	NakesRepo        patientRegNakesRepo
-	NotificationRepo notificationRepo
-	OCRGateway       *ocr.KTPOCRGateway
-	WhatsApp         *whatsapp.WhatsAppGateway
-	Log              *zap.Logger
+	DB                *gorm.DB
+	PatientRepo       patientRepo
+	NakesRepo         patientRegNakesRepo
+	NotificationRepo  notificationRepo
+	PendingCredential pendingCredentialStasher
+	OCRGateway        *ocr.KTPOCRGateway
+	WhatsApp          *whatsapp.WhatsAppGateway
+	Log               *zap.Logger
+}
+
+// pendingCredentialStasher menyimpan kredensial yang menunggu warm-up (di Redis).
+type pendingCredentialStasher interface {
+	Stash(ctx context.Context, phone string, data repository.PendingCredential, ttl time.Duration) error
 }
 
 type patientRepo interface {
@@ -48,7 +62,6 @@ type patientRegNakesRepo interface {
 
 type notificationRepo interface {
 	Create(db *gorm.DB, entity *entity.Notification) error
-	Update(db *gorm.DB, entity *entity.Notification) error
 }
 
 func (u *PatientRegistrationUseCase) ScanKTP(ctx context.Context, file multipart.File, filename string) (*model.KTPOCRResponse, error) {
@@ -125,26 +138,30 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 
 	u.Log.Info("patient registered", zap.String("patient_id", patient.ID), zap.String("faskes_id", faskesID))
 
-	// Kirim kredensial login ke WA pasien & pendamping secara SINKRON (timeout terbatas)
-	// lalu catat hasilnya ke tabel notifications untuk audit. Kegagalan WA TIDAK boleh
-	// menggagalkan registrasi yang sudah tersimpan — hasilnya hanya tercermin di
-	// wa_delivery pada response, dan faskes tetap menerima kredensial sebagai cadangan.
-	var wa model.WADeliveryStatus
+	// Alur warm-up: backend TIDAK mengirim kredensial duluan (WhatsApp memblokir kontak
+	// baru dengan error 463). Sebagai gantinya, catat baris audit `queued`, simpan kredensial
+	// menunggu di Redis, dan kembalikan link wa.me supaya pasien/pendamping menghubungi bot
+	// lebih dulu — saat mereka masuk, WAInboundUseCase mengirim kredensial. Faskes selalu
+	// punya kredensial dari response sebagai cadangan terjamin.
+	botPhone := u.WhatsApp.BotPhone()
+	warmup := model.WAWarmupStatus{
+		BotPhone: botPhone,
+		Status:   warmupStatusPending,
+	}
+	if botPhone == "" {
+		warmup.Status = warmupStatusUnavailable
+	}
 
-	wa.Patient = u.sendCredentialAndRecord(
-		ctx, patient.ID, patient.PhoneNumber, "patient", patient.FullName, patient.Username,
-		func(c context.Context) error {
-			return u.WhatsApp.SendRegistrationCredentials(c, patient.PhoneNumber, patient.FullName, patient.Username, req.Password)
-		},
-	)
+	warmup.PatientLink = u.prepareWarmup(ctx, patient.ID, patient.PhoneNumber,
+		entity.RecipientRolePatient, patient.FullName, "", patient.Username, req.Password, botPhone)
+	warmup.PatientMessage = helper.BuildWarmupShareMessage(
+		entity.RecipientRolePatient, patient.FullName, "", patient.Username, warmup.PatientLink)
 
 	if patient.CompanionPhone != "" {
-		wa.Companion = u.sendCredentialAndRecord(
-			ctx, patient.ID, patient.CompanionPhone, "companion", patient.CompanionName, patient.Username,
-			func(c context.Context) error {
-				return u.WhatsApp.SendCompanionRegistrationCredentials(c, patient.CompanionPhone, patient.CompanionName, patient.FullName, patient.Username, req.Password)
-			},
-		)
+		warmup.CompanionLink = u.prepareWarmup(ctx, patient.ID, patient.CompanionPhone,
+			entity.RecipientRoleCompanion, patient.CompanionName, patient.FullName, patient.Username, req.Password, botPhone)
+		warmup.CompanionMessage = helper.BuildWarmupShareMessage(
+			entity.RecipientRoleCompanion, patient.CompanionName, patient.FullName, patient.Username, warmup.CompanionLink)
 	}
 
 	return &model.PatientRegisterResponse{
@@ -158,23 +175,22 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 			Username: patient.Username,
 			Password: req.Password,
 		},
-		WADelivery: wa,
+		WAWarmup: warmup,
 	}, nil
 }
 
-// sendCredentialAndRecord mengirim satu pesan kredensial via WA (dibungkus sendFn) dan
-// mencatat percobaannya ke tabel notifications sebagai audit. Mengembalikan "sent" bila
-// WA sukses, "failed" bila gagal. Sengaja tidak mengembalikan error: kegagalan WA atau DB
-// tidak boleh menggagalkan registrasi yang sudah tersimpan — cukup tercermin di status & log.
-func (u *PatientRegistrationUseCase) sendCredentialAndRecord(
+// prepareWarmup mencatat baris audit notifications (status queued, TANPA password),
+// menyimpan kredensial menunggu warm-up di Redis (di-keyed nomor penerima), dan
+// mengembalikan link wa.me first-contact. Kegagalan DB/Redis di-log tapi TIDAK
+// menggagalkan registrasi yang sudah tersimpan (partial failure, be_implementation §6) —
+// faskes tetap memegang kredensial di response.
+func (u *PatientRegistrationUseCase) prepareWarmup(
 	ctx context.Context,
-	patientID, recipientPhone, recipientRole, recipientName, username string,
-	sendFn func(context.Context) error,
+	patientID, recipientPhone, recipientRole, recipientName, patientName, username, password, botPhone string,
 ) string {
-	// Payload audit sengaja TANPA password — hanya metadata non-sensitif.
-	// Disimpan sebagai string JSON: kolom `payload` bertipe jsonb, dan driver pgx
-	// mengirim []byte sebagai bytea (gagal di-parse jsonb) sedangkan string dikirim
-	// sebagai teks yang benar di-parse Postgres menjadi jsonb.
+	// Payload audit sengaja TANPA password — hanya metadata non-sensitif. Disimpan sebagai
+	// string JSON karena kolom `payload` bertipe jsonb (driver pgx mengirim []byte sebagai
+	// bytea yang gagal di-parse jsonb; string dikirim sebagai teks yang benar).
 	payload, _ := json.Marshal(map[string]string{
 		"username":       username,
 		"recipient_name": recipientName,
@@ -185,45 +201,29 @@ func (u *PatientRegistrationUseCase) sendCredentialAndRecord(
 		PatientID:      &pid,
 		RecipientPhone: recipientPhone,
 		RecipientRole:  recipientRole,
-		MessageType:    "credential_blast",
+		MessageType:    entity.MessageTypeCredentialBlast,
 		Channel:        "whatsapp",
 		Payload:        string(payload),
-		Status:         "queued",
+		Status:         entity.NotificationStatusQueued,
 		QueuedAt:       time.Now(),
 	}
-	recorded := true
 	if err := u.NotificationRepo.Create(u.DB, notif); err != nil {
-		// Gagal membuat baris audit bukan alasan membatalkan pengiriman kredensial.
 		u.Log.Warn("failed to record credential notification",
 			zap.String("patient_id", patientID), zap.String("recipient_role", recipientRole), zap.Error(err))
-		recorded = false
 	}
 
-	sendCtx, cancel := context.WithTimeout(ctx, waSendTimeout)
-	defer cancel()
-	sendErr := sendFn(sendCtx)
-
-	status := "sent"
-	if sendErr != nil {
-		status = "failed"
-		u.Log.Warn("failed to send wa registration credentials",
-			zap.String("patient_id", patientID), zap.String("recipient_role", recipientRole), zap.Error(sendErr))
+	if err := u.PendingCredential.Stash(ctx, recipientPhone, repository.PendingCredential{
+		Role:           recipientRole,
+		RecipientName:  recipientName,
+		PatientName:    patientName,
+		Username:       username,
+		Password:       password,
+		NotificationID: notif.ID,
+	}, repository.PendingCredentialDefaultTTL); err != nil {
+		u.Log.Warn("failed to stash pending credential for warm-up",
+			zap.String("patient_id", patientID), zap.String("recipient_role", recipientRole),
+			zap.String("phone", helper.MaskPhone(recipientPhone)), zap.Error(err))
 	}
 
-	if recorded {
-		notif.Status = status
-		if sendErr != nil {
-			reason := sendErr.Error()
-			notif.ErrorReason = &reason
-		} else {
-			sentAt := time.Now()
-			notif.SentAt = &sentAt
-		}
-		if err := u.NotificationRepo.Update(u.DB, notif); err != nil {
-			u.Log.Warn("failed to update credential notification status",
-				zap.String("patient_id", patientID), zap.String("notification_id", notif.ID), zap.Error(err))
-		}
-	}
-
-	return status
+	return helper.BuildWAMeLink(botPhone, waWarmupPrefillText)
 }

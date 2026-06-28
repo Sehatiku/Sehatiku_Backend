@@ -3,6 +3,7 @@ package config
 import (
 	"sehatiku-backend/internal/delivery/http/controller"
 	"sehatiku-backend/internal/delivery/http/routing"
+	wadelivery "sehatiku-backend/internal/delivery/whatsapp"
 	ocrgw "sehatiku-backend/internal/gateway/ocr"
 	"sehatiku-backend/internal/gateway/whatsapp"
 	"sehatiku-backend/internal/helper"
@@ -35,6 +36,10 @@ func BootStrap(config *BootStrapConfig) {
 	patientRepo := &repository.PatientRepository{}
 	notificationRepo := &repository.NotificationRepository{}
 	sessionRepo := &repository.SessionRepository{
+		Redis: config.Redis,
+		Log:   config.Log,
+	}
+	pendingCredentialRepo := &repository.PendingCredentialRepository{
 		Redis: config.Redis,
 		Log:   config.Log,
 	}
@@ -81,11 +86,13 @@ func BootStrap(config *BootStrapConfig) {
 		Log:         config.Log,
 	}
 	nakesRegUC := &usecase.NakesRegistrationUseCase{
-		DB:         config.DB,
-		NakesRepo:  nakesRepo,
-		OCRGateway: ktpOCRGateway,
-		WhatsApp:   config.WhatsApp,
-		Log:        config.Log,
+		DB:                config.DB,
+		NakesRepo:         nakesRepo,
+		NotificationRepo:  notificationRepo,
+		PendingCredential: pendingCredentialRepo,
+		OCRGateway:        ktpOCRGateway,
+		WhatsApp:          config.WhatsApp,
+		Log:               config.Log,
 	}
 	faskesUC := &usecase.FaskesUseCase{
 		DB:         config.DB,
@@ -104,14 +111,26 @@ func BootStrap(config *BootStrapConfig) {
 		Log:         config.Log,
 	}
 	patientRegUC := &usecase.PatientRegistrationUseCase{
-		DB:               config.DB,
-		PatientRepo:      patientRepo,
-		NakesRepo:        nakesRepo,
-		NotificationRepo: notificationRepo,
-		OCRGateway:       ktpOCRGateway,
-		WhatsApp:         config.WhatsApp,
-		Log:              config.Log,
+		DB:                config.DB,
+		PatientRepo:       patientRepo,
+		NakesRepo:         nakesRepo,
+		NotificationRepo:  notificationRepo,
+		PendingCredential: pendingCredentialRepo,
+		OCRGateway:        ktpOCRGateway,
+		WhatsApp:          config.WhatsApp,
+		Log:               config.Log,
 	}
+
+	// Warm-up WhatsApp: handler pesan masuk yang mengirim kredensial saat penerima
+	// menghubungi bot lebih dulu (mengatasi blok kontak-dingin / error 463).
+	waInboundUC := &usecase.WAInboundUseCase{
+		DB:                config.DB,
+		PendingCredential: pendingCredentialRepo,
+		WhatsApp:          config.WhatsApp,
+		NotificationRepo:  notificationRepo,
+		Log:               config.Log,
+	}
+	wadelivery.NewInboundHandler(waInboundUC, config.Log).Register(config.WhatsApp.Client)
 	dashboardRepo := &repository.DashboardRepository{}
 	dashboardUC := &usecase.DashboardUseCase{
 		DB:            config.DB,

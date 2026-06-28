@@ -2,7 +2,9 @@ package whatsapp
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"sehatiku-backend/internal/helper"
@@ -13,6 +15,20 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
+
+// ErrColdContactBlocked menandai kegagalan kirim karena WhatsApp memblokir pengiriman ke
+// kontak dingin — server membalas error 463 (NackCallerReachoutTimelocked). Ini BUKAN bug
+// kode: WhatsApp membatasi akun yang mengirim ke nomor yang belum pernah menghubungi bot
+// lebih dulu. Solusinya adalah alur warm-up (penerima menghubungi bot dahulu lewat link
+// wa.me), bukan retry. Sentinel ini memisahkan kegagalan "wajar & diketahui" ini dari
+// kegagalan tak terduga supaya log & status tidak menyesatkan.
+var ErrColdContactBlocked = errors.New("whatsapp memblokir pengiriman ke kontak baru (reachout time-lock, error 463)")
+
+// isReachoutTimelocked mengenali error 463 dari ack server whatsmeow
+// (fmt.Errorf("%w %d", ErrServerReturnedError, 463)).
+func isReachoutTimelocked(err error) bool {
+	return errors.Is(err, whatsmeow.ErrServerReturnedError) && strings.Contains(err.Error(), "463")
+}
 
 // waConnectWaitTimeout adalah batas waktu menunggu socket WA pulih sebelum sebuah
 // pengiriman pesan menyerah. Dengan EnableAutoReconnect aktif, koneksi yang putus
@@ -28,6 +44,16 @@ type WhatsAppGateway struct {
 
 func New(client *whatsmeow.Client, log *zap.Logger) *WhatsAppGateway {
 	return &WhatsAppGateway{Client: client, Log: log}
+}
+
+// BotPhone mengembalikan nomor WA bot (format internasional telanjang, mis. "62812...")
+// untuk membangun link wa.me first-contact. Mengembalikan "" bila device belum dipasangkan
+// (Store.ID nil) — pemanggil memakai ini untuk menandai link tidak tersedia.
+func (g *WhatsAppGateway) BotPhone() string {
+	if g.Client == nil || g.Client.Store == nil || g.Client.Store.ID == nil {
+		return ""
+	}
+	return g.Client.Store.ID.User
 }
 
 // SendLoginNotification mengirim notifikasi teks ke nomor WA saat login berhasil.
@@ -124,5 +150,8 @@ func (g *WhatsAppGateway) sendText(ctx context.Context, toPhone, text string) er
 	_, err := g.Client.SendMessage(ctx, jid, &waE2E.Message{
 		Conversation: proto.String(text),
 	})
+	if err != nil && isReachoutTimelocked(err) {
+		return fmt.Errorf("%w: %v", ErrColdContactBlocked, err)
+	}
 	return err
 }
