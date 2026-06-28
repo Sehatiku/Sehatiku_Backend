@@ -20,7 +20,7 @@ type Notification struct {
 	RecipientRole     string     `gorm:"column:recipient_role"`
 	MessageType       string     `gorm:"column:message_type"`
 	Channel           string     `gorm:"column:channel"`
-	Payload           []byte     `gorm:"column:payload;type:jsonb"`
+	Payload           string     `gorm:"column:payload;type:jsonb"`
 	Status            string     `gorm:"column:status"`
 	ProviderMessageID *string    `gorm:"column:provider_message_id"`
 	ErrorReason       *string    `gorm:"column:error_reason"`

@@ -25,9 +25,12 @@ func ConnectDB(viper *viper.Viper, log *zap.Logger) *gorm.DB {
 		}
 	}
 
+	// Session pooler Supabase (port 5432) mendukung prepared statements, jadi kita biarkan
+	// pgx pakai protokol extended (default) — lebih cepat dan membuat codec tipe (mis. jsonb)
+	// bekerja normal. JANGAN aktifkan PreferSimpleProtocol kecuali pindah ke transaction
+	// pooler (6543), yang tidak mendukung prepared statements.
 	db, err := gorm.Open(postgres.New(postgres.Config{
-		DSN:                  dbURL,
-		PreferSimpleProtocol: true,
+		DSN: dbURL,
 	}), &gorm.Config{})
 
 	if err != nil {
