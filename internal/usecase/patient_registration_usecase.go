@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"mime/multipart"
@@ -16,17 +17,23 @@ import (
 	"gorm.io/gorm"
 )
 
+// waSendTimeout membatasi berapa lama registrasi menunggu satu pengiriman kredensial WA
+// sebelum dianggap gagal. Cukup pendek supaya response registrasi tidak menggantung saat
+// WhatsApp putus, tapi cukup longgar untuk pengiriman normal saat koneksi sehat.
+const waSendTimeout = 15 * time.Second
+
 // ErrAssignedNakesInvalid dikembalikan bila assigned_nakes_id pada request tidak
 // merujuk ke nakes mana pun, atau merujuk ke nakes milik faskes lain (isolasi tenant).
 var ErrAssignedNakesInvalid = errors.New("assigned_nakes_id tidak valid atau bukan milik faskes ini")
 
 type PatientRegistrationUseCase struct {
-	DB          *gorm.DB
-	PatientRepo patientRepo
-	NakesRepo   patientRegNakesRepo
-	OCRGateway  *ocr.KTPOCRGateway
-	WhatsApp    *whatsapp.WhatsAppGateway
-	Log         *zap.Logger
+	DB               *gorm.DB
+	PatientRepo      patientRepo
+	NakesRepo        patientRegNakesRepo
+	NotificationRepo notificationRepo
+	OCRGateway       *ocr.KTPOCRGateway
+	WhatsApp         *whatsapp.WhatsAppGateway
+	Log              *zap.Logger
 }
 
 type patientRepo interface {
@@ -37,6 +44,11 @@ type patientRepo interface {
 
 type patientRegNakesRepo interface {
 	FindByID(db *gorm.DB, id string) (*entity.Nakes, error)
+}
+
+type notificationRepo interface {
+	Create(db *gorm.DB, entity *entity.Notification) error
+	Update(db *gorm.DB, entity *entity.Notification) error
 }
 
 func (u *PatientRegistrationUseCase) ScanKTP(ctx context.Context, file multipart.File, filename string) (*model.KTPOCRResponse, error) {
@@ -113,19 +125,27 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 
 	u.Log.Info("patient registered", zap.String("patient_id", patient.ID), zap.String("faskes_id", faskesID))
 
-	// Kirim kredensial login ke WA pasien dan pendamping secara fire-and-forget —
-	// kegagalan WA tidak boleh menggagalkan registrasi yang sudah tersimpan.
-	go func(p entity.Patient, password string) {
-		if err := u.WhatsApp.SendRegistrationCredentials(context.Background(), p.PhoneNumber, p.FullName, p.Username, password); err != nil {
-			u.Log.Warn("failed to send wa registration credentials to patient", zap.String("patient_id", p.ID), zap.Error(err))
-		}
-		if p.CompanionPhone == "" {
-			return
-		}
-		if err := u.WhatsApp.SendCompanionRegistrationCredentials(context.Background(), p.CompanionPhone, p.CompanionName, p.FullName, p.Username, password); err != nil {
-			u.Log.Warn("failed to send wa registration credentials to companion", zap.String("patient_id", p.ID), zap.Error(err))
-		}
-	}(*patient, req.Password)
+	// Kirim kredensial login ke WA pasien & pendamping secara SINKRON (timeout terbatas)
+	// lalu catat hasilnya ke tabel notifications untuk audit. Kegagalan WA TIDAK boleh
+	// menggagalkan registrasi yang sudah tersimpan — hasilnya hanya tercermin di
+	// wa_delivery pada response, dan faskes tetap menerima kredensial sebagai cadangan.
+	var wa model.WADeliveryStatus
+
+	wa.Patient = u.sendCredentialAndRecord(
+		ctx, patient.ID, patient.PhoneNumber, "patient", patient.FullName, patient.Username,
+		func(c context.Context) error {
+			return u.WhatsApp.SendRegistrationCredentials(c, patient.PhoneNumber, patient.FullName, patient.Username, req.Password)
+		},
+	)
+
+	if patient.CompanionPhone != "" {
+		wa.Companion = u.sendCredentialAndRecord(
+			ctx, patient.ID, patient.CompanionPhone, "companion", patient.CompanionName, patient.Username,
+			func(c context.Context) error {
+				return u.WhatsApp.SendCompanionRegistrationCredentials(c, patient.CompanionPhone, patient.CompanionName, patient.FullName, patient.Username, req.Password)
+			},
+		)
+	}
 
 	return &model.PatientRegisterResponse{
 		PatientID:   patient.ID,
@@ -134,5 +154,73 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 		NIK:         patient.NIK,
 		DiseaseType: patient.DiseaseType,
 		EnrolledAt:  patient.EnrolledAt,
+		Credentials: model.PatientCredentials{
+			Username: patient.Username,
+			Password: req.Password,
+		},
+		WADelivery: wa,
 	}, nil
+}
+
+// sendCredentialAndRecord mengirim satu pesan kredensial via WA (dibungkus sendFn) dan
+// mencatat percobaannya ke tabel notifications sebagai audit. Mengembalikan "sent" bila
+// WA sukses, "failed" bila gagal. Sengaja tidak mengembalikan error: kegagalan WA atau DB
+// tidak boleh menggagalkan registrasi yang sudah tersimpan — cukup tercermin di status & log.
+func (u *PatientRegistrationUseCase) sendCredentialAndRecord(
+	ctx context.Context,
+	patientID, recipientPhone, recipientRole, recipientName, username string,
+	sendFn func(context.Context) error,
+) string {
+	// Payload audit sengaja TANPA password — hanya metadata non-sensitif.
+	payload, _ := json.Marshal(map[string]string{
+		"username":       username,
+		"recipient_name": recipientName,
+	})
+
+	pid := patientID
+	notif := &entity.Notification{
+		PatientID:      &pid,
+		RecipientPhone: recipientPhone,
+		RecipientRole:  recipientRole,
+		MessageType:    "credential_blast",
+		Channel:        "whatsapp",
+		Payload:        payload,
+		Status:         "queued",
+		QueuedAt:       time.Now(),
+	}
+	recorded := true
+	if err := u.NotificationRepo.Create(u.DB, notif); err != nil {
+		// Gagal membuat baris audit bukan alasan membatalkan pengiriman kredensial.
+		u.Log.Warn("failed to record credential notification",
+			zap.String("patient_id", patientID), zap.String("recipient_role", recipientRole), zap.Error(err))
+		recorded = false
+	}
+
+	sendCtx, cancel := context.WithTimeout(ctx, waSendTimeout)
+	defer cancel()
+	sendErr := sendFn(sendCtx)
+
+	status := "sent"
+	if sendErr != nil {
+		status = "failed"
+		u.Log.Warn("failed to send wa registration credentials",
+			zap.String("patient_id", patientID), zap.String("recipient_role", recipientRole), zap.Error(sendErr))
+	}
+
+	if recorded {
+		notif.Status = status
+		if sendErr != nil {
+			reason := sendErr.Error()
+			notif.ErrorReason = &reason
+		} else {
+			sentAt := time.Now()
+			notif.SentAt = &sentAt
+		}
+		if err := u.NotificationRepo.Update(u.DB, notif); err != nil {
+			u.Log.Warn("failed to update credential notification status",
+				zap.String("patient_id", patientID), zap.String("notification_id", notif.ID), zap.Error(err))
+		}
+	}
+
+	return status
 }

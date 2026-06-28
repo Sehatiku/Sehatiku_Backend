@@ -99,9 +99,18 @@ func (g *WhatsAppGateway) sendText(ctx context.Context, toPhone, text string) er
 	// Device terpasang tapi socket sedang tidak terhubung — kemungkinan besar sedang
 	// reconnect. Tunggu sampai koneksi pulih (atau timeout) sebelum menyerah, supaya
 	// kredensial tidak hilang hanya karena kebetulan dikirim di celah reconnect.
+	// Pemanggil sinkron (mis. registrasi pasien) menetapkan deadline lewat ctx supaya
+	// request tidak menggantung 30 detik saat WA putus; pemanggil fire-and-forget tanpa
+	// deadline memakai waConnectWaitTimeout penuh.
 	if !g.Client.IsConnected() {
-		if !g.Client.WaitForConnection(waConnectWaitTimeout) {
-			return fmt.Errorf("whatsapp client not connected (timeout %s menunggu reconnect)", waConnectWaitTimeout)
+		waitTimeout := waConnectWaitTimeout
+		if dl, ok := ctx.Deadline(); ok {
+			if remaining := time.Until(dl); remaining < waitTimeout {
+				waitTimeout = remaining
+			}
+		}
+		if waitTimeout <= 0 || !g.Client.WaitForConnection(waitTimeout) {
+			return fmt.Errorf("whatsapp client not connected (timeout menunggu reconnect)")
 		}
 	}
 
