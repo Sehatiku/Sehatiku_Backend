@@ -86,6 +86,11 @@ func BootStrap(config *BootStrapConfig) {
 		WhatsApp:   config.WhatsApp,
 		Log:        config.Log,
 	}
+	faskesUC := &usecase.FaskesUseCase{
+		DB:         config.DB,
+		FaskesRepo: faskesRepo,
+		Log:        config.Log,
+	}
 	nakesUC := &usecase.NakesUseCase{
 		DB:        config.DB,
 		NakesRepo: nakesRepo,
@@ -118,9 +123,21 @@ func BootStrap(config *BootStrapConfig) {
 		PatientRepo: patientRepo,
 		Log:         config.Log,
 	}
+	healthLogRepo := &repository.HealthLogRepository{}
+	healthLogGuardRepo := &repository.HealthLogGuardRepository{
+		Redis: config.Redis,
+		Log:   config.Log,
+	}
+	healthLogUC := &usecase.HealthLogUseCase{
+		DB:            config.DB,
+		HealthLogRepo: healthLogRepo,
+		GuardRepo:     healthLogGuardRepo,
+		Log:           config.Log,
+	}
 
 	// Controllers
 	faskesAuthCtrl := &controller.FaskesAuthController{UseCase: faskesAuthUC}
+	faskesCtrl := &controller.FaskesController{UseCase: faskesUC}
 	nakesAuthCtrl := &controller.NakesAuthController{UseCase: nakesAuthUC}
 	patientAuthCtrl := &controller.PatientAuthController{UseCase: patientAuthUC}
 	tokenCtrl := &controller.TokenController{UseCase: tokenUC}
@@ -133,6 +150,7 @@ func BootStrap(config *BootStrapConfig) {
 		QueueUseCase:   dashboardUC,
 	}
 	patientDashboardCtrl := &controller.PatientDashboardController{UseCase: patientDashboardUC}
+	healthLogCtrl := &controller.HealthLogController{UseCase: healthLogUC}
 
 	config.App.Validator = &CustomValidator{validator: config.Validate}
 
@@ -140,6 +158,7 @@ func BootStrap(config *BootStrapConfig) {
 		App:                           config.App,
 		JWTHelper:                     config.JWT,
 		FaskesAuthController:          faskesAuthCtrl,
+		FaskesController:              faskesCtrl,
 		NakesAuthController:           nakesAuthCtrl,
 		PatientAuthController:         patientAuthCtrl,
 		TokenController:               tokenCtrl,
@@ -149,6 +168,7 @@ func BootStrap(config *BootStrapConfig) {
 		PatientRegistrationController: patientRegCtrl,
 		DashboardController:           dashboardCtrl,
 		PatientDashboardController:    patientDashboardCtrl,
+		HealthLogController:           healthLogCtrl,
 	}
 	routeConfig.SetUp()
 }

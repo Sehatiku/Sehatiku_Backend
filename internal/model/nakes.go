@@ -45,6 +45,23 @@ type NakesListItem struct {
 	EnrolledAt  time.Time `json:"enrolled_at"`
 }
 
+// ── Nakes Detail (faskes view) ───────────────────────────────────────────────
+
+type NakesDetailResponse struct {
+	NakesID     string    `json:"nakes_id"`
+	FaskesID    string    `json:"faskes_id"`
+	FullName    string    `json:"full_name"`
+	Role        string    `json:"role"`
+	NIK         string    `json:"nik"`
+	Alamat      string    `json:"alamat"`
+	PhoneNumber string    `json:"phone_number"`
+	Username    string    `json:"username"`
+	Status      string    `json:"status"`
+	EnrolledAt  time.Time `json:"enrolled_at"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 // ── Nakes Status Update ──────────────────────────────────────────────────────
 
 type UpdateNakesStatusRequest struct {

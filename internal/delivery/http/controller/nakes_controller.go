@@ -10,6 +10,7 @@ import (
 
 type nakesUseCase interface {
 	ListNakes(ctx context.Context, faskesID string) ([]model.NakesListItem, error)
+	GetNakesDetail(ctx context.Context, faskesID, nakesID string) (*model.NakesDetailResponse, error)
 	UpdateNakesStatus(ctx context.Context, faskesID, nakesID string, req *model.UpdateNakesStatusRequest) (*model.UpdateNakesStatusResponse, error)
 }
 
@@ -31,6 +32,28 @@ func (c *NakesController) ListNakes(ctx *echo.Context) error {
 	return ctx.JSON(http.StatusOK, model.WebResponse[[]model.NakesListItem]{
 		Message: "daftar nakes berhasil diambil",
 		Data:    items,
+	})
+}
+
+func (c *NakesController) GetNakesDetail(ctx *echo.Context) error {
+	claims := getFaskesClaimsFromCtx(ctx)
+
+	nakesID := ctx.Param("id")
+	if nakesID == "" {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
+			Message: "bad request",
+			Errors:  "nakes id wajib diisi",
+		})
+	}
+
+	detail, err := c.UseCase.GetNakesDetail(ctx.Request().Context(), claims.FaskesID, nakesID)
+	if err != nil {
+		return mapNakesError(ctx, err)
+	}
+
+	return ctx.JSON(http.StatusOK, model.WebResponse[*model.NakesDetailResponse]{
+		Message: "detail nakes berhasil diambil",
+		Data:    detail,
 	})
 }
 
