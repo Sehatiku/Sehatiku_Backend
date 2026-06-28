@@ -27,16 +27,15 @@ type PatientRegisterResponse struct {
 	DiseaseType string    `json:"disease_type"`
 	EnrolledAt  time.Time `json:"enrolled_at"`
 
-	// Credentials dikembalikan SEKALI ke faskes saat registrasi supaya faskes punya
-	// kanal cadangan menyampaikan login ke pasien/pendamping secara langsung bila
-	// pengiriman WhatsApp gagal (mis. WhatsApp memblokir kontak baru — error 463).
+	// Credentials dikembalikan SEKALI ke faskes saat registrasi sebagai kanal cadangan
+	// TERJAMIN: faskes selalu bisa menyampaikan login ke pasien/pendamping secara langsung.
 	// Password yang sama persis dengan yang diinput faskes; tidak ada eksposur baru.
 	Credentials PatientCredentials `json:"credentials"`
 
-	// WADelivery melaporkan hasil pengiriman kredensial via WhatsApp per penerima
-	// ("sent" / "failed"). Faskes memakai ini untuk memutuskan perlu menyampaikan
-	// kredensial manual atau tidak.
-	WADelivery WADeliveryStatus `json:"wa_delivery"`
+	// WAWarmup berisi link wa.me first-contact untuk pasien & pendamping. WhatsApp memblokir
+	// pesan keluar ke kontak baru (error 463), jadi backend TIDAK mengirim kredensial duluan;
+	// penerima harus menghubungi bot lewat link ini, lalu bot otomatis membalas kredensial.
+	WAWarmup WAWarmupStatus `json:"wa_warmup"`
 }
 
 type PatientCredentials struct {
@@ -44,7 +43,22 @@ type PatientCredentials struct {
 	Password string `json:"password"`
 }
 
-type WADeliveryStatus struct {
-	Patient   string `json:"patient"`             // "sent" | "failed"
-	Companion string `json:"companion,omitempty"` // "sent" | "failed"; kosong bila tanpa pendamping
+// WAWarmupStatus melaporkan alur warm-up WhatsApp ke faskes. Faskes menampilkan/meneruskan
+// link ke penerima supaya mereka menghubungi bot lebih dulu.
+type WAWarmupStatus struct {
+	BotPhone      string `json:"bot_phone"`                // nomor bot; "" bila device WA belum dipasangkan
+	PatientLink   string `json:"patient_link,omitempty"`   // link wa.me untuk pasien
+	CompanionLink string `json:"companion_link,omitempty"` // link wa.me untuk pendamping; kosong bila tanpa pendamping
+	NakesLink     string `json:"nakes_link,omitempty"`     // link wa.me untuk nakes (dipakai pada registrasi nakes)
+
+	// *_message adalah teks SIAP-TEMPEL (faskes-mediated) berisi sapaan + username + link
+	// aktivasi — faskes tinggal salin-bagikan ke penerima via kanal pribadi mereka. SENGAJA
+	// tanpa password (password tetap jalan bot→penerima setelah warm-up). Kosong/dihilangkan
+	// bila link terkait kosong (bot belum dipasangkan) atau penerima tidak ada (mis. tanpa
+	// pendamping). Lihat helper.BuildWarmupShareMessage.
+	PatientMessage   string `json:"patient_message,omitempty"`
+	CompanionMessage string `json:"companion_message,omitempty"`
+	NakesMessage     string `json:"nakes_message,omitempty"`
+
+	Status string `json:"status"` // "pending" (menunggu penerima chat bot) | "unavailable" (bot belum dipasangkan)
 }

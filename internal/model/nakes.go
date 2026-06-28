@@ -8,7 +8,7 @@ type KTPOCRResponse struct {
 	NIK         string `json:"nik"`
 	FullName    string `json:"full_name"`
 	DateOfBirth string `json:"date_of_birth"` // YYYY-MM-DD
-	Sex         string `json:"sex"`            // male | female
+	Sex         string `json:"sex"`           // male | female
 	Alamat      string `json:"alamat"`
 }
 
@@ -31,6 +31,20 @@ type NakesRegisterResponse struct {
 	Role       string    `json:"role"`
 	NIK        string    `json:"nik"`
 	EnrolledAt time.Time `json:"enrolled_at"`
+
+	// Credentials dikembalikan SEKALI ke faskes sebagai kanal cadangan terjamin (sama
+	// seperti registrasi pasien) — faskes selalu bisa menyampaikan login langsung ke nakes.
+	Credentials NakesCredentials `json:"credentials"`
+
+	// WAWarmup berisi link wa.me first-contact untuk nakes. Backend tidak mengirim kredensial
+	// duluan (WhatsApp memblokir kontak baru, error 463); nakes menghubungi bot lewat link
+	// ini, lalu bot otomatis membalas kredensial.
+	WAWarmup WAWarmupStatus `json:"wa_warmup"`
+}
+
+type NakesCredentials struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // ── Nakes List ───────────────────────────────────────────────────────────────
