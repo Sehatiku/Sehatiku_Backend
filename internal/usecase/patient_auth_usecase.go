@@ -67,12 +67,6 @@ func (u *PatientAuthUseCase) Login(ctx context.Context, req *model.PatientLoginR
 		return nil, fmt.Errorf("issuing refresh token: %w", err)
 	}
 
-	go func() {
-		if err := u.WhatsApp.SendLoginNotification(context.Background(), patient.PhoneNumber, patient.FullName); err != nil {
-			u.Log.Warn("failed to send wa login notification", zap.String("patient_id", patient.ID), zap.Error(err))
-		}
-	}()
-
 	return &model.PatientLoginResponse{
 		Token: model.TokenResponse{
 			AccessToken:  accessToken,

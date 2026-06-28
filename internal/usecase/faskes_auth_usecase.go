@@ -100,12 +100,6 @@ func (u *FaskesAuthUseCase) Login(ctx context.Context, req *model.FaskesLoginReq
 		return nil, fmt.Errorf("issuing refresh token: %w", err)
 	}
 
-	go func() {
-		if err := u.WhatsApp.SendLoginNotification(context.Background(), faskes.PhoneNumber, faskes.Name); err != nil {
-			u.Log.Warn("failed to send wa login notification", zap.String("faskes_id", faskes.ID), zap.Error(err))
-		}
-	}()
-
 	return &model.FaskesLoginResponse{
 		Token: model.TokenResponse{
 			AccessToken:  accessToken,
