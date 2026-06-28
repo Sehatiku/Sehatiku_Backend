@@ -3,6 +3,9 @@ package entity
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type RiskScore struct {
@@ -21,4 +24,11 @@ type RiskScore struct {
 
 func (RiskScore) TableName() string {
 	return "risk_scores"
+}
+
+func (r *RiskScore) BeforeCreate(tx *gorm.DB) error {
+	if r.ID == "" {
+		r.ID = uuid.New().String()
+	}
+	return nil
 }
