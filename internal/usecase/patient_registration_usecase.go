@@ -172,6 +172,9 @@ func (u *PatientRegistrationUseCase) sendCredentialAndRecord(
 	sendFn func(context.Context) error,
 ) string {
 	// Payload audit sengaja TANPA password — hanya metadata non-sensitif.
+	// Disimpan sebagai string JSON: kolom `payload` bertipe jsonb, dan driver pgx
+	// mengirim []byte sebagai bytea (gagal di-parse jsonb) sedangkan string dikirim
+	// sebagai teks yang benar di-parse Postgres menjadi jsonb.
 	payload, _ := json.Marshal(map[string]string{
 		"username":       username,
 		"recipient_name": recipientName,
@@ -184,7 +187,7 @@ func (u *PatientRegistrationUseCase) sendCredentialAndRecord(
 		RecipientRole:  recipientRole,
 		MessageType:    "credential_blast",
 		Channel:        "whatsapp",
-		Payload:        payload,
+		Payload:        string(payload),
 		Status:         "queued",
 		QueuedAt:       time.Now(),
 	}
