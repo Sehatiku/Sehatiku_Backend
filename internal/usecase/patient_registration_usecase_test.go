@@ -129,12 +129,12 @@ func TestRegisterPatient_StashesWarmupAndReturnsCredentials(t *testing.T) {
 	if resp.WAWarmup.PatientLink != "" {
 		t.Errorf("expected empty patient link when bot not paired, got %q", resp.WAWarmup.PatientLink)
 	}
-	// Tanpa link, tidak ada pesan siap-bagikan yang bisa ditindaklanjuti.
-	if resp.WAWarmup.PatientMessage != "" {
-		t.Errorf("expected empty patient message when bot not paired, got %q", resp.WAWarmup.PatientMessage)
+	// Tanpa link bot, tidak ada direct link ke penerima yang bisa ditindaklanjuti.
+	if resp.WAWarmup.PatientDirectLink != "" {
+		t.Errorf("expected empty patient direct link when bot not paired, got %q", resp.WAWarmup.PatientDirectLink)
 	}
-	if resp.WAWarmup.CompanionMessage != "" {
-		t.Errorf("expected empty companion message when bot not paired, got %q", resp.WAWarmup.CompanionMessage)
+	if resp.WAWarmup.CompanionDirectLink != "" {
+		t.Errorf("expected empty companion direct link when bot not paired, got %q", resp.WAWarmup.CompanionDirectLink)
 	}
 
 	// Dua baris audit notifikasi tercatat.

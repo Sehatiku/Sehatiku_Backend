@@ -51,14 +51,15 @@ type WAWarmupStatus struct {
 	CompanionLink string `json:"companion_link,omitempty"` // link wa.me untuk pendamping; kosong bila tanpa pendamping
 	NakesLink     string `json:"nakes_link,omitempty"`     // link wa.me untuk nakes (dipakai pada registrasi nakes)
 
-	// *_message adalah teks SIAP-TEMPEL (faskes-mediated) berisi sapaan + username + link
-	// aktivasi — faskes tinggal salin-bagikan ke penerima via kanal pribadi mereka. SENGAJA
-	// tanpa password (password tetap jalan bot→penerima setelah warm-up). Kosong/dihilangkan
-	// bila link terkait kosong (bot belum dipasangkan) atau penerima tidak ada (mis. tanpa
-	// pendamping). Lihat helper.BuildWarmupShareMessage.
-	PatientMessage   string `json:"patient_message,omitempty"`
-	CompanionMessage string `json:"companion_message,omitempty"`
-	NakesMessage     string `json:"nakes_message,omitempty"`
+	// *_direct_link adalah link wa.me yang menunjuk ke nomor PENERIMA sendiri, dengan teks
+	// undangan aktivasi (sapaan + username + link warm-up bot) sudah terisi. Faskes klik link
+	// → WhatsApp faskes langsung membuka chat ke pasien/pendamping/nakes, tinggal tekan kirim.
+	// SENGAJA tanpa password (password tetap jalan bot→penerima setelah warm-up). Kosong/
+	// dihilangkan bila bot belum dipasangkan atau penerima tidak ada (mis. tanpa pendamping).
+	// Lihat helper.BuildDirectInviteLink.
+	PatientDirectLink   string `json:"patient_direct_link,omitempty"`
+	CompanionDirectLink string `json:"companion_direct_link,omitempty"`
+	NakesDirectLink     string `json:"nakes_direct_link,omitempty"`
 
 	Status string `json:"status"` // "pending" (menunggu penerima chat bot) | "unavailable" (bot belum dipasangkan)
 }
