@@ -11,9 +11,12 @@ type PatientDashboardResponse struct {
 }
 
 type PatientDashboardProfile struct {
-	FullName    string `json:"full_name"`
-	Age         int    `json:"age"`
-	DiseaseType string `json:"disease_type"`
+	FullName          string `json:"full_name"`
+	Age               int    `json:"age"`
+	DiseaseType       string `json:"disease_type"`
+	CompanionName     string `json:"companion_name"`
+	CompanionPhone    string `json:"companion_phone"`
+	AssignedNakesName string `json:"assigned_nakes_name"`
 }
 
 type PatientDashboardRisk struct {

@@ -107,3 +107,72 @@ func (r *PatientDashboardRepository) GetLogDatesSince(db *gorm.DB, patientID str
 	}
 	return dates, nil
 }
+
+// GetNakesFullName mengambil full_name nakes berdasarkan ID-nya.
+// Mengembalikan "" (bukan error) jika nakes tidak ditemukan — caller menangani gracefully.
+func (r *PatientDashboardRepository) GetNakesFullName(db *gorm.DB, nakesID string) (string, error) {
+	var result struct{ FullName string }
+	err := db.Raw(`SELECT full_name FROM nakes WHERE id = ? LIMIT 1`, nakesID).Scan(&result).Error
+	if err != nil {
+		return "", fmt.Errorf("getting nakes full_name: %w", err)
+	}
+	return result.FullName, nil
+}
+
+// RecordHistoryRaw adalah satu baris data harian agregat per hari dari health_logs,
+// dipakai oleh GetRecordHistory untuk mendukung grafik di Patient App.
+type RecordHistoryRaw struct {
+	LogDate    time.Time `gorm:"column:log_date"`
+	BloodSugar *float64  `gorm:"column:blood_sugar"`
+	BpRaw      *string   `gorm:"column:bp_raw"`
+	Weight     *float64  `gorm:"column:weight"`
+}
+
+// GetRecordHistory mengambil riwayat harian (glucose, bp, weight) per hari terbaru.
+// Untuk setiap hari, diambil satu nilai terbaru per metrik (DISTINCT ON per hari).
+// Query ini bekerja setelah migration 000008 (yang menambah 'weight' ke enum health_metric).
+func (r *PatientDashboardRepository) GetRecordHistory(db *gorm.DB, patientID string, limit int) ([]RecordHistoryRaw, error) {
+	var rows []RecordHistoryRaw
+	err := db.Raw(`
+		WITH days AS (
+			SELECT DISTINCT measured_at::date AS log_date
+			FROM health_logs
+			WHERE patient_id = ?
+			  AND metric_type IN ('glucose', 'bp', 'weight')
+			ORDER BY log_date DESC
+			LIMIT ?
+		),
+		glucose AS (
+			SELECT DISTINCT ON (measured_at::date) measured_at::date AS log_date, value_numeric
+			FROM health_logs
+			WHERE patient_id = ? AND metric_type = 'glucose' AND value_numeric IS NOT NULL
+			ORDER BY measured_at::date DESC, measured_at DESC
+		),
+		bp AS (
+			SELECT DISTINCT ON (measured_at::date) measured_at::date AS log_date, value_jsonb::text AS bp_raw
+			FROM health_logs
+			WHERE patient_id = ? AND metric_type = 'bp' AND value_jsonb IS NOT NULL
+			ORDER BY measured_at::date DESC, measured_at DESC
+		),
+		wt AS (
+			SELECT DISTINCT ON (measured_at::date) measured_at::date AS log_date, value_numeric
+			FROM health_logs
+			WHERE patient_id = ? AND metric_type = 'weight' AND value_numeric IS NOT NULL
+			ORDER BY measured_at::date DESC, measured_at DESC
+		)
+		SELECT
+			d.log_date,
+			g.value_numeric AS blood_sugar,
+			b.bp_raw,
+			w.value_numeric AS weight
+		FROM days d
+		LEFT JOIN glucose g USING (log_date)
+		LEFT JOIN bp b USING (log_date)
+		LEFT JOIN wt w USING (log_date)
+		ORDER BY d.log_date DESC
+	`, patientID, limit, patientID, patientID, patientID).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("getting record history: %w", err)
+	}
+	return rows, nil
+}
