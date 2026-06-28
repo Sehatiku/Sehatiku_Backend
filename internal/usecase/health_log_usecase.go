@@ -138,6 +138,8 @@ func applyMetricValue(req *model.CreateHealthLogRequest, log *entity.HealthLog) 
 		return setNumeric(req, log, 0, 200, "smoking (batang) harus antara 0 dan 200")
 	case "alcohol":
 		return setNumeric(req, log, 0, 100, "alcohol (unit) harus antara 0 dan 100")
+	case "weight":
+		return setNumeric(req, log, 1, 500, "weight (kg) harus antara 1 dan 500")
 	case "bp":
 		return setBloodPressure(req, log)
 	case "food":

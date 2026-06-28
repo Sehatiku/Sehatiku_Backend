@@ -144,6 +144,7 @@ func BootStrap(config *BootStrapConfig) {
 		PatientRepo: patientRepo,
 		Log:         config.Log,
 	}
+	consultationRepo := &repository.ConsultationRepository{}
 	healthLogRepo := &repository.HealthLogRepository{}
 	healthLogGuardRepo := &repository.HealthLogGuardRepository{
 		Redis: config.Redis,
@@ -154,6 +155,23 @@ func BootStrap(config *BootStrapConfig) {
 		HealthLogRepo: healthLogRepo,
 		GuardRepo:     healthLogGuardRepo,
 		Log:           config.Log,
+	}
+	assignedNakesUC := &usecase.AssignedNakesUseCase{
+		DB:          config.DB,
+		PatientRepo: patientRepo,
+		NakesRepo:   nakesRepo,
+		Log:         config.Log,
+	}
+	consultationUC := &usecase.ConsultationUseCase{
+		DB:   config.DB,
+		Repo: consultationRepo,
+		Log:  config.Log,
+	}
+	recordUC := &usecase.RecordUseCase{
+		DB:          config.DB,
+		LogRepo:     healthLogRepo,
+		HistoryRepo: patientDashboardRepo,
+		Log:         config.Log,
 	}
 
 	// Controllers
@@ -172,6 +190,9 @@ func BootStrap(config *BootStrapConfig) {
 	}
 	patientDashboardCtrl := &controller.PatientDashboardController{UseCase: patientDashboardUC}
 	healthLogCtrl := &controller.HealthLogController{UseCase: healthLogUC}
+	assignedNakesCtrl := &controller.AssignedNakesController{UseCase: assignedNakesUC}
+	consultationCtrl := &controller.ConsultationController{UseCase: consultationUC}
+	recordCtrl := &controller.RecordController{UseCase: recordUC}
 
 	config.App.Validator = &CustomValidator{validator: config.Validate}
 
@@ -190,6 +211,9 @@ func BootStrap(config *BootStrapConfig) {
 		DashboardController:           dashboardCtrl,
 		PatientDashboardController:    patientDashboardCtrl,
 		HealthLogController:           healthLogCtrl,
+		AssignedNakesController:       assignedNakesCtrl,
+		ConsultationController:        consultationCtrl,
+		RecordController:              recordCtrl,
 	}
 	routeConfig.SetUp()
 }

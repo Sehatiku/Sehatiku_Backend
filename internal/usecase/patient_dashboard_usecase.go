@@ -46,6 +46,7 @@ type patientDashboardRepo interface {
 	GetLatestGlucose(db *gorm.DB, patientID string) (*repository.GlucoseRow, error)
 	GetLatestBP(db *gorm.DB, patientID string) (*repository.BPRow, error)
 	GetLogDatesSince(db *gorm.DB, patientID string, since time.Time) ([]time.Time, error)
+	GetNakesFullName(db *gorm.DB, nakesID string) (string, error)
 }
 
 type patientProfileRepo interface {
@@ -63,6 +64,22 @@ func (u *PatientDashboardUseCase) GetDashboard(ctx context.Context, patientID st
 	patient, err := u.PatientRepo.FindByCondition(u.DB, "id = ?", patientID)
 	if err != nil {
 		return nil, fmt.Errorf("loading patient profile %s: %w", patientID, err)
+	}
+
+	// Ambil nama nakes penanggung jawab; non-fatal bila tidak ditemukan (data integrity issue,
+	// bukan error request) — field dibiarkan kosong agar dashboard tetap tampil.
+	var assignedNakesName string
+	if patient.AssignedNakesID != "" {
+		name, err := u.Repo.GetNakesFullName(u.DB, patient.AssignedNakesID)
+		if err != nil {
+			u.Log.Warn("failed to load assigned nakes name",
+				zap.String("patient_id", patientID),
+				zap.String("assigned_nakes_id", patient.AssignedNakesID),
+				zap.Error(err),
+			)
+		} else {
+			assignedNakesName = name
+		}
 	}
 
 	riskRow, err := u.Repo.GetLatestRisk(u.DB, patientID)
@@ -90,9 +107,12 @@ func (u *PatientDashboardUseCase) GetDashboard(ctx context.Context, patientID st
 
 	resp := &model.PatientDashboardResponse{
 		Profile: model.PatientDashboardProfile{
-			FullName:    patient.FullName,
-			Age:         calcAge(patient.DateOfBirth),
-			DiseaseType: patient.DiseaseType,
+			FullName:          patient.FullName,
+			Age:               calcAge(patient.DateOfBirth),
+			DiseaseType:       patient.DiseaseType,
+			CompanionName:     patient.CompanionName,
+			CompanionPhone:    patient.CompanionPhone,
+			AssignedNakesName: assignedNakesName,
 		},
 		Risk:               buildRiskSection(riskRow),
 		LatestMeasurements: buildMeasurements(glucoseRow, bpRow),

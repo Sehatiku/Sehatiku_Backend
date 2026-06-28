@@ -7,7 +7,7 @@ import "time"
 // dilakukan di usecase (struct tag tidak cukup untuk aturan polimorfik). measured_at
 // dikirim client (RFC3339 / ISO 8601), bukan diisi server — lihat docs/api_guide.md §7.
 type CreateHealthLogRequest struct {
-	MetricType   string   `json:"metric_type" validate:"required,oneof=glucose bp med_adherence food activity sleep stress smoking alcohol"`
+	MetricType   string   `json:"metric_type" validate:"required,oneof=glucose bp med_adherence food activity sleep stress smoking alcohol weight"`
 	ValueNumeric *float64 `json:"value_numeric"`
 	ValueText    string   `json:"value_text"`
 	Systolic     *int     `json:"systolic"`
