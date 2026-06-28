@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sehatiku-backend/internal/entity"
+	"sehatiku-backend/internal/helper"
 	"sehatiku-backend/internal/model"
 
 	"go.uber.org/zap"
@@ -43,9 +44,11 @@ func (u *AssignedNakesUseCase) GetAssignedNakes(ctx context.Context, patientID s
 		return nil, fmt.Errorf("loading assigned nakes %s: %w", patient.AssignedNakesID, err)
 	}
 
+	normalizedPhone := helper.NormalizePhoneID(nakes.PhoneNumber)
 	resp := &model.AssignedNakesResponse{
 		FullName:      nakes.FullName,
 		WhatsappPhone: nakes.PhoneNumber,
+		WaLink:        helper.BuildWAMeLink(normalizedPhone, ""),
 		Schedule:      []model.ScheduleEntry{},
 	}
 

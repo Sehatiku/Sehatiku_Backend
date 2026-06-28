@@ -14,6 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
+
 type NakesAuthUseCase struct {
 	DB          *gorm.DB
 	NakesRepo   *repository.NakesRepository
@@ -63,12 +64,6 @@ func (u *NakesAuthUseCase) Login(ctx context.Context, req *model.NakesLoginReque
 	if err != nil {
 		return nil, fmt.Errorf("issuing refresh token: %w", err)
 	}
-
-	go func() {
-		if err := u.WhatsApp.SendLoginNotification(context.Background(), nakes.PhoneNumber, nakes.FullName); err != nil {
-			u.Log.Warn("failed to send wa login notification", zap.String("nakes_id", nakes.ID), zap.Error(err))
-		}
-	}()
 
 	return &model.NakesLoginResponse{
 		Token: model.TokenResponse{
