@@ -15,6 +15,7 @@ func NewEcho(config *viper.Viper) *echo.Echo {
 		AllowOrigins: []string{
 			"https://sehatiku.vercel.app",
 			"http://localhost:5174",
+			"http://localhost:5173",
 		},
 		AllowMethods: []string{
 			http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions,
