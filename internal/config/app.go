@@ -161,15 +161,22 @@ func BootStrap(config *BootStrapConfig) {
 		Log:         config.Log,
 	}
 	consultationUC := &usecase.ConsultationUseCase{
-		DB:   config.DB,
-		Repo: consultationRepo,
-		Log:  config.Log,
+		DB:          config.DB,
+		Repo:        consultationRepo,
+		PatientRepo: patientRepo,
+		NotifRepo:   notificationRepo,
+		Log:         config.Log,
 	}
 	recordUC := &usecase.RecordUseCase{
 		DB:          config.DB,
 		LogRepo:     healthLogRepo,
 		HistoryRepo: patientDashboardRepo,
 		Log:         config.Log,
+	}
+	patientNotificationUC := &usecase.PatientNotificationUseCase{
+		DB:        config.DB,
+		NotifRepo: notificationRepo,
+		Log:       config.Log,
 	}
 
 	// Controllers
@@ -191,6 +198,7 @@ func BootStrap(config *BootStrapConfig) {
 	assignedNakesCtrl := &controller.AssignedNakesController{UseCase: assignedNakesUC}
 	consultationCtrl := &controller.ConsultationController{UseCase: consultationUC}
 	recordCtrl := &controller.RecordController{UseCase: recordUC}
+	patientNotificationCtrl := &controller.PatientNotificationController{UseCase: patientNotificationUC}
 
 	config.App.Validator = &CustomValidator{validator: config.Validate}
 
@@ -210,8 +218,9 @@ func BootStrap(config *BootStrapConfig) {
 		PatientDashboardController:    patientDashboardCtrl,
 		HealthLogController:           healthLogCtrl,
 		AssignedNakesController:       assignedNakesCtrl,
-		ConsultationController:        consultationCtrl,
-		RecordController:              recordCtrl,
+		ConsultationController:          consultationCtrl,
+		RecordController:                recordCtrl,
+		PatientNotificationController:   patientNotificationCtrl,
 	}
 	routeConfig.SetUp()
 }

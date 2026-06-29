@@ -25,8 +25,9 @@ type RouteConfig struct {
 	PatientDashboardController    *controller.PatientDashboardController
 	HealthLogController           *controller.HealthLogController
 	AssignedNakesController       *controller.AssignedNakesController
-	ConsultationController        *controller.ConsultationController
-	RecordController              *controller.RecordController
+	ConsultationController          *controller.ConsultationController
+	RecordController                *controller.RecordController
+	PatientNotificationController   *controller.PatientNotificationController
 }
 
 func (r *RouteConfig) SetUp() {
@@ -69,6 +70,8 @@ func (r *RouteConfig) SetupNakesAuthedRoute() {
 	g.GET("/profile", r.NakesController.GetMyProfile)
 	g.GET("/dashboard/summary", r.DashboardController.GetSummary)
 	g.GET("/dashboard/patient-queue", r.DashboardController.GetPatientQueue)
+	g.GET("/consultations", r.ConsultationController.GetNakesList)
+	g.POST("/consultations/:id/reply", r.ConsultationController.Reply)
 }
 
 func (r *RouteConfig) SetupPatientGuestRoute() {
@@ -82,9 +85,11 @@ func (r *RouteConfig) SetupPatientAuthedRoute() {
 	g.POST("/health-logs", r.HealthLogController.Create)
 	g.GET("/assigned-nakes", r.AssignedNakesController.GetAssignedNakes)
 	g.POST("/consultations", r.ConsultationController.Create)
+	g.GET("/consultations", r.ConsultationController.GetPatientList)
 	g.POST("/records", r.RecordController.Create)
 	g.GET("/records/history", r.RecordController.GetHistory)
 	g.GET("/records/today-status", r.RecordController.GetTodayStatus)
+	g.GET("/notifications", r.PatientNotificationController.GetNotifications)
 }
 
 func (r *RouteConfig) SetupTokenRoute() {

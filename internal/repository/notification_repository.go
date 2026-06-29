@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"time"
 
 	"sehatiku-backend/internal/entity"
@@ -14,6 +15,17 @@ import (
 // status & retry_count sudah siap bila nanti dibutuhkan).
 type NotificationRepository struct {
 	Repository[entity.Notification]
+}
+
+// FindInAppByPatientID mengembalikan semua notifikasi in-app milik pasien, terbaru dulu.
+func (r *NotificationRepository) FindInAppByPatientID(db *gorm.DB, patientID string) ([]entity.Notification, error) {
+	var rows []entity.Notification
+	if err := db.Where("patient_id = ? AND channel = ?", patientID, entity.NotificationChannelInApp).
+		Order("created_at DESC").
+		Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("finding in-app notifications for patient %s: %w", patientID, err)
+	}
+	return rows, nil
 }
 
 // MarkStatus memperbarui status satu baris notifikasi berdasarkan id tanpa harus memuat
