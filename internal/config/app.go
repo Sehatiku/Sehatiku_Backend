@@ -164,6 +164,7 @@ func BootStrap(config *BootStrapConfig) {
 		DB:          config.DB,
 		Repo:        consultationRepo,
 		PatientRepo: patientRepo,
+		NakesRepo:   nakesRepo,
 		NotifRepo:   notificationRepo,
 		Log:         config.Log,
 	}
