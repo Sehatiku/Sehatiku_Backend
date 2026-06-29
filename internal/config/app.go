@@ -44,6 +44,7 @@ func BootStrap(config *BootStrapConfig) {
 		Redis: config.Redis,
 		Log:   config.Log,
 	}
+	patientClinicalBaselineRepo := &repository.PatientClinicalBaselineRepository{}
 
 	// Gateways
 	ktpOCRBaseURL := config.Config.GetString("KTP_OCR_BASE_URL")
@@ -115,6 +116,7 @@ func BootStrap(config *BootStrapConfig) {
 		NakesRepo:         nakesRepo,
 		NotificationRepo:  notificationRepo,
 		PendingCredential: pendingCredentialRepo,
+		BaselineRepo:      patientClinicalBaselineRepo,
 		OCRGateway:        ktpOCRGateway,
 		WhatsApp:          config.WhatsApp,
 		Log:               config.Log,

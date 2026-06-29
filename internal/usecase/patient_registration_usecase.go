@@ -40,6 +40,7 @@ type PatientRegistrationUseCase struct {
 	NakesRepo         patientRegNakesRepo
 	NotificationRepo  notificationRepo
 	PendingCredential pendingCredentialStasher
+	BaselineRepo      baselineRepo
 	OCRGateway        *ocr.KTPOCRGateway
 	WhatsApp          *whatsapp.WhatsAppGateway
 	Log               *zap.Logger
@@ -62,6 +63,10 @@ type patientRegNakesRepo interface {
 
 type notificationRepo interface {
 	Create(db *gorm.DB, entity *entity.Notification) error
+}
+
+type baselineRepo interface {
+	Create(db *gorm.DB, baseline *entity.PatientClinicalBaseline) error
 }
 
 func (u *PatientRegistrationUseCase) ScanKTP(ctx context.Context, file multipart.File, filename string) (*model.KTPOCRResponse, error) {
@@ -137,6 +142,15 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 	}
 
 	u.Log.Info("patient registered", zap.String("patient_id", patient.ID), zap.String("faskes_id", faskesID))
+
+	// Create clinical baseline. Non-fatal: patient is already persisted; a baseline
+	// failure does not roll back registration. Faskes can re-submit baseline separately
+	// if needed.
+	baseline := buildBaseline(patient.ID, req.Baseline)
+	if err := u.BaselineRepo.Create(u.DB, baseline); err != nil {
+		u.Log.Warn("failed to create clinical baseline",
+			zap.String("patient_id", patient.ID), zap.Error(err))
+	}
 
 	// Alur warm-up: backend TIDAK mengirim kredensial duluan (WhatsApp memblokir kontak
 	// baru dengan error 463). Sebagai gantinya, catat baris audit `queued`, simpan kredensial
@@ -226,4 +240,50 @@ func (u *PatientRegistrationUseCase) prepareWarmup(
 	}
 
 	return helper.BuildWAMeLink(botPhone, waWarmupPrefillText)
+}
+
+func buildBaseline(patientID string, b model.PatientBaselineRequest) *entity.PatientClinicalBaseline {
+	return &entity.PatientClinicalBaseline{
+		PatientID:             patientID,
+		RecordedAt:            time.Now(),
+		AgeYears:              b.AgeYears,
+		Sex:                   b.Sex,
+		BMI:                   b.BMI,
+		BMICategory:           b.BMICategory,
+		WaistCircumferenceCm:  b.WaistCircumferenceCm,
+		CentralObesity:        derefBool(b.CentralObesity),
+		SmokingStatus:         b.SmokingStatus,
+		AlcoholUse:            derefBool(b.AlcoholUse),
+		PhysicalActivity:      b.PhysicalActivity,
+		FamilyHistoryDiabetes: derefBool(b.FamilyHistoryDiabetes),
+		FamilyHistoryCVD:      derefBool(b.FamilyHistoryCVD),
+		SystolicBPMmhg:        b.SystolicBPMmhg,
+		DiastolicBPMmhg:       b.DiastolicBPMmhg,
+		HypertensionStatus:    b.HypertensionStatus,
+		FastingGlucoseMgdl:    b.FastingGlucoseMgdl,
+		HbA1cPct:              b.HbA1cPct,
+		DiabetesStatus:        b.DiabetesStatus,
+		TotalCholesterolMgdl:  b.TotalCholesterolMgdl,
+		HDLMgdl:               b.HDLMgdl,
+		LDLMgdl:               b.LDLMgdl,
+		TriglyceidesMgdl:      b.TriglyceidesMgdl,
+		CVDRisk10YrPct:        b.CVDRisk10YrPct,
+		CVDRiskCategory:       b.CVDRiskCategory,
+		OnAntihypertensive:    derefBool(b.OnAntihypertensive),
+		OnAntidiabetic:        derefBool(b.OnAntidiabetic),
+		OnStatin:              derefBool(b.OnStatin),
+		TargetRisk:            b.TargetRisk,
+		EGFR:                  b.EGFR,
+		UACR:                  b.UACR,
+		ClusterID:             b.ClusterID,
+		DiagnosisCluster:      b.DiagnosisCluster,
+		ClinicalGroup:         b.ClinicalGroup,
+	}
+}
+
+func derefBool(p *bool) bool {
+	if p != nil {
+		return *p
+	}
+	return false
 }
