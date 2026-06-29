@@ -217,9 +217,21 @@ func setFood(req *model.CreateHealthLogRequest, log *entity.HealthLog) error {
 // terjangkau, log tetap tersimpan teks-saja (value_jsonb null) dan request tetap sukses —
 // gizi belum terhitung sampai di-enrich ulang.
 func (u *HealthLogUseCase) enrichFood(ctx context.Context, log *entity.HealthLog, text string) {
-	res, err := u.Extractor.ExtractChat(ctx, text)
+	enrichFoodJSONB(ctx, u.Extractor, log, text, u.Log)
+}
+
+// enrichFoodJSONB menjalankan teks makanan lewat NER+TKPI (ML /extract) dan menulis gizi
+// teragregasi ke value_jsonb. Helper paket: dipakai HealthLogUseCase (per-metrik) dan
+// RecordUseCase (form harian) agar perilaku enrichment identik. Kunci `carbs_g`/`sodium_mg`
+// harus persis — dibaca roll-7 SQL. Bila ML tak terjangkau, value_jsonb dibiarkan null dan
+// pemanggil tidak digagalkan (makanan tetap tersimpan teks-saja).
+func enrichFoodJSONB(ctx context.Context, ex foodExtractor, log *entity.HealthLog, text string, logger *zap.Logger) {
+	if ex == nil {
+		return
+	}
+	res, err := ex.ExtractChat(ctx, text)
 	if err != nil {
-		u.Log.Warn("enrichment makanan dilewati (ML tidak terjangkau)",
+		logger.Warn("enrichment makanan dilewati (ML tidak terjangkau)",
 			zap.String("patient_id", log.PatientID), zap.Error(err))
 		return
 	}
@@ -233,7 +245,7 @@ func (u *HealthLogUseCase) enrichFood(ctx context.Context, log *entity.HealthLog
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		u.Log.Warn("gagal marshal value_jsonb makanan", zap.String("patient_id", log.PatientID), zap.Error(err))
+		logger.Warn("gagal marshal value_jsonb makanan", zap.String("patient_id", log.PatientID), zap.Error(err))
 		return
 	}
 	s := string(raw)
