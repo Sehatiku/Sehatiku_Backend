@@ -85,6 +85,7 @@ func BootStrap(config *BootStrapConfig) {
 	nakesRegUC := &usecase.NakesRegistrationUseCase{
 		DB:                config.DB,
 		NakesRepo:         nakesRepo,
+		FaskesRepo:        faskesRepo,
 		NotificationRepo:  notificationRepo,
 		PendingCredential: pendingCredentialRepo,
 		OCRGateway:        ktpOCRGateway,

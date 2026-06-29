@@ -23,7 +23,6 @@ type NakesRegisterRequest struct {
 	Username       string          `json:"username"        validate:"required,min=4,max=50"`
 	Password       string          `json:"password"        validate:"required,min=8"`
 	Specialization *string         `json:"specialization"`
-	Hospital       *string         `json:"hospital"`
 	Schedule       []ScheduleEntry `json:"schedule"`
 }
 
