@@ -14,6 +14,7 @@ import (
 type recordUseCase interface {
 	CreateRecord(ctx context.Context, patientID string, req *model.CreateRecordRequest) (*model.CreateRecordResponse, error)
 	GetHistory(ctx context.Context, patientID string, limit int) ([]model.RecordHistoryItem, error)
+	GetTodayStatus(ctx context.Context, patientID string) (*model.TodayStatusResponse, error)
 }
 
 type RecordController struct {
@@ -53,6 +54,26 @@ func (c *RecordController) Create(ctx *echo.Context) error {
 
 	return ctx.JSON(http.StatusCreated, model.WebResponse[*model.CreateRecordResponse]{
 		Message: "catatan harian berhasil disimpan",
+		Data:    data,
+	})
+}
+
+// GetTodayStatus menangani GET /api/v1/patients/records/today-status.
+// Mengembalikan apakah pasien sudah mengisi data harian hari ini (WIB) agar mobile
+// dapat memunculkan pop-up pengingat.
+func (c *RecordController) GetTodayStatus(ctx *echo.Context) error {
+	claims := getPatientClaimsFromCtx(ctx)
+
+	data, err := c.UseCase.GetTodayStatus(ctx.Request().Context(), claims.PatientID)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
+			Message: "internal server error",
+			Errors:  err.Error(),
+		})
+	}
+
+	return ctx.JSON(http.StatusOK, model.WebResponse[*model.TodayStatusResponse]{
+		Message: "status input harian berhasil diambil",
 		Data:    data,
 	})
 }

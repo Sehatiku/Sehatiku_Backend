@@ -91,13 +91,13 @@ func (r *PatientDashboardRepository) GetLatestBP(db *gorm.DB, patientID string) 
 	return &BPRow{ValueJSONB: rows[0].ValueJSONB, MeasuredAt: rows[0].MeasuredAt}, nil
 }
 
-// GetLogDatesSince mengembalikan daftar tanggal distinct (measured_at::date) yang punya
+// GetLogDatesSince mengembalikan daftar tanggal distinct (zona Asia/Jakarta) yang punya
 // minimal satu health_log sejak `since`, terurut menurun. Dipakai usecase untuk menghitung
-// logged_today dan streak.
+// logged_today dan streak; tanggal dihitung di WIB agar konsisten dengan endpoint status harian.
 func (r *PatientDashboardRepository) GetLogDatesSince(db *gorm.DB, patientID string, since time.Time) ([]time.Time, error) {
 	var dates []time.Time
 	err := db.Raw(`
-		SELECT DISTINCT measured_at::date AS log_date
+		SELECT DISTINCT (measured_at AT TIME ZONE 'Asia/Jakarta')::date AS log_date
 		FROM health_logs
 		WHERE patient_id = ? AND measured_at >= ?
 		ORDER BY log_date DESC
@@ -106,6 +106,27 @@ func (r *PatientDashboardRepository) GetLogDatesSince(db *gorm.DB, patientID str
 		return nil, fmt.Errorf("getting log dates: %w", err)
 	}
 	return dates, nil
+}
+
+// GetLastLogAt mengembalikan measured_at health_log terakhir milik pasien, atau nil jika
+// pasien belum pernah mengisi sama sekali. Dipakai endpoint status input harian untuk
+// menghitung logged_today dan jumlah hari sejak input terakhir (dihitung di WIB oleh usecase).
+func (r *PatientDashboardRepository) GetLastLogAt(db *gorm.DB, patientID string) (*time.Time, error) {
+	var rows []time.Time
+	err := db.Raw(`
+		SELECT measured_at
+		FROM health_logs
+		WHERE patient_id = ?
+		ORDER BY measured_at DESC
+		LIMIT 1
+	`, patientID).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("getting last log time: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	return &rows[0], nil
 }
 
 // GetNakesFullName mengambil full_name nakes berdasarkan ID-nya.

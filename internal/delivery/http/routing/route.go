@@ -83,6 +83,7 @@ func (r *RouteConfig) SetupPatientAuthedRoute() {
 	g.POST("/consultations", r.ConsultationController.Create)
 	g.POST("/records", r.RecordController.Create)
 	g.GET("/records/history", r.RecordController.GetHistory)
+	g.GET("/records/today-status", r.RecordController.GetTodayStatus)
 }
 
 func (r *RouteConfig) SetupTokenRoute() {

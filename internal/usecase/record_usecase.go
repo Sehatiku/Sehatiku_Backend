@@ -9,6 +9,7 @@ import (
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/repository"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -27,6 +28,7 @@ type recordHealthLogRepo interface {
 
 type recordHistoryRepo interface {
 	GetRecordHistory(db *gorm.DB, patientID string, limit int) ([]repository.RecordHistoryRaw, error)
+	GetLastLogAt(db *gorm.DB, patientID string) (*time.Time, error)
 }
 
 type RecordUseCase struct {
@@ -159,6 +161,43 @@ func (u *RecordUseCase) CreateRecord(ctx context.Context, patientID string, req 
 		RecordedAt: recordedAt,
 		Created:    created,
 	}, nil
+}
+
+// GetTodayStatus mengecek status input harian pasien dari sudut pandang WIB:
+//   - logged_today: true jika log terakhir jatuh di tanggal hari ini (WIB).
+//   - days_since_last_log: jumlah hari kalender (WIB) sejak input terakhir (0 jika hari ini,
+//     1 jika kemarin, dst). nil jika pasien belum pernah mengisi sama sekali.
+//   - last_logged_at: waktu input terakhir, nil jika belum pernah.
+//
+// Dipakai mobile untuk memunculkan pop-up pengingat dan menampilkan "sudah X hari tidak mengisi".
+func (u *RecordUseCase) GetTodayStatus(ctx context.Context, patientID string) (*model.TodayStatusResponse, error) {
+	lastAt, err := u.HistoryRepo.GetLastLogAt(u.DB, patientID)
+	if err != nil {
+		return nil, fmt.Errorf("getting today status for patient %s: %w", patientID, err)
+	}
+
+	now := time.Now().In(wibLocation)
+	resp := &model.TodayStatusResponse{
+		Date: now.Format("2006-01-02"),
+	}
+	if lastAt != nil {
+		days := daysBetween(lastAt.In(wibLocation), now)
+		resp.LoggedToday = days == 0
+		resp.DaysSinceLastLog = &days
+		resp.LastLoggedAt = lastAt
+	}
+	return resp, nil
+}
+
+// daysBetween menghitung selisih hari kalender antara `earlier` dan `later`.
+// Keduanya harus sudah berada di zona waktu yang sama (mis. WIB). WIB tidak memiliki DST
+// sehingga selisih selalu kelipatan 24 jam tepat.
+func daysBetween(earlier, later time.Time) int {
+	y1, m1, d1 := earlier.Date()
+	y2, m2, d2 := later.Date()
+	startEarlier := time.Date(y1, m1, d1, 0, 0, 0, 0, later.Location())
+	startLater := time.Date(y2, m2, d2, 0, 0, 0, 0, later.Location())
+	return int(startLater.Sub(startEarlier).Hours()) / 24
 }
 
 // GetHistory mengambil riwayat catatan harian pasien (glucose, bp, weight) untuk grafik.
