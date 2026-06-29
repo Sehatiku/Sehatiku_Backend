@@ -1,0 +1,4 @@
+-- PostgreSQL does not support removing enum values (no ALTER TYPE ... DROP VALUE).
+-- Reversing this migration would require dropping and recreating the message_type type
+-- along with every column that depends on it — too disruptive for a down migration.
+-- This is intentionally a no-op; remove 'consultation_reply' usages from data manually if needed.

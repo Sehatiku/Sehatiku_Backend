@@ -23,6 +23,10 @@ type consultationPatientRepo interface {
 	FindByID(db *gorm.DB, id string) (*entity.Patient, error)
 }
 
+type consultationNakesRepo interface {
+	FindByID(db *gorm.DB, id string) (*entity.Nakes, error)
+}
+
 type consultationNotifRepo interface {
 	Create(db *gorm.DB, n *entity.Notification) error
 }
@@ -31,6 +35,7 @@ type ConsultationUseCase struct {
 	DB          *gorm.DB
 	Repo        consultationRepo
 	PatientRepo consultationPatientRepo
+	NakesRepo   consultationNakesRepo
 	NotifRepo   consultationNotifRepo
 	Log         *zap.Logger
 }
@@ -97,6 +102,12 @@ func (u *ConsultationUseCase) ReplyConsultation(ctx context.Context, consultatio
 		zap.String("nakes_id", nakesID),
 	)
 
+	// Resolve nakes name for the notification payload. Fall back to nakes_id if lookup fails.
+	nakesName := nakesID
+	if nakes, err := u.NakesRepo.FindByID(u.DB, nakesID); err == nil {
+		nakesName = nakes.FullName
+	}
+
 	// Create in-app notification for the patient. Non-critical: log and continue on failure.
 	notif := &entity.Notification{
 		PatientID:      &c.PatientID,
@@ -104,7 +115,7 @@ func (u *ConsultationUseCase) ReplyConsultation(ctx context.Context, consultatio
 		RecipientRole:  entity.RecipientRolePatient,
 		MessageType:    entity.MessageTypeConsultationReply,
 		Channel:        entity.NotificationChannelInApp,
-		Payload:        fmt.Sprintf(`{"consultation_id":%q,"nakes_id":%q,"nakes_note":%q}`, consultationID, nakesID, req.NakesNote),
+		Payload:        fmt.Sprintf(`{"consultation_id":%q,"nakes_name":%q,"nakes_note":%q}`, consultationID, nakesName, req.NakesNote),
 		Status:         entity.NotificationStatusSent,
 		QueuedAt:       now,
 	}

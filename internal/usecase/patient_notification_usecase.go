@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sehatiku-backend/internal/entity"
 	"sehatiku-backend/internal/model"
@@ -20,6 +21,12 @@ type PatientNotificationUseCase struct {
 	Log       *zap.Logger
 }
 
+type consultationReplyPayload struct {
+	ConsultationID string `json:"consultation_id"`
+	NakesName      string `json:"nakes_name"`
+	NakesNote      string `json:"nakes_note"`
+}
+
 func (u *PatientNotificationUseCase) GetNotifications(ctx context.Context, patientID string) ([]model.PatientNotificationResponse, error) {
 	rows, err := u.NotifRepo.FindInAppByPatientID(u.DB, patientID)
 	if err != nil {
@@ -28,12 +35,23 @@ func (u *PatientNotificationUseCase) GetNotifications(ctx context.Context, patie
 
 	out := make([]model.PatientNotificationResponse, len(rows))
 	for i, r := range rows {
-		out[i] = model.PatientNotificationResponse{
+		item := model.PatientNotificationResponse{
 			ID:          r.ID,
 			MessageType: r.MessageType,
-			Payload:     r.Payload,
 			CreatedAt:   r.CreatedAt,
 		}
+		var p consultationReplyPayload
+		if err := json.Unmarshal([]byte(r.Payload), &p); err == nil {
+			item.ConsultationID = p.ConsultationID
+			item.NakesName = p.NakesName
+			item.NakesNote = p.NakesNote
+		} else {
+			u.Log.Warn("failed to parse notification payload",
+				zap.String("notification_id", r.ID),
+				zap.Error(err),
+			)
+		}
+		out[i] = item
 	}
 	return out, nil
 }
