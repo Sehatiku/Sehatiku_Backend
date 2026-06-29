@@ -78,6 +78,31 @@ func (u *NakesUseCase) GetNakesDetail(ctx context.Context, faskesID, nakesID str
 	}, nil
 }
 
+func (u *NakesUseCase) GetMyProfile(ctx context.Context, nakesID string) (*model.NakesDetailResponse, error) {
+	nakes, err := u.NakesRepo.FindByID(u.DB, nakesID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNakesNotFound
+		}
+		return nil, fmt.Errorf("finding nakes %s: %w", nakesID, err)
+	}
+
+	return &model.NakesDetailResponse{
+		NakesID:     nakes.ID,
+		FaskesID:    nakes.FaskesID,
+		FullName:    nakes.FullName,
+		Role:        nakes.Role,
+		NIK:         nakes.NIK,
+		Alamat:      nakes.Alamat,
+		PhoneNumber: nakes.PhoneNumber,
+		Username:    nakes.Username,
+		Status:      nakes.Status,
+		EnrolledAt:  nakes.EnrolledAt,
+		CreatedAt:   nakes.CreatedAt,
+		UpdatedAt:   nakes.UpdatedAt,
+	}, nil
+}
+
 func (u *NakesUseCase) UpdateNakesStatus(ctx context.Context, faskesID, nakesID string, req *model.UpdateNakesStatusRequest) (*model.UpdateNakesStatusResponse, error) {
 	nakes, err := u.NakesRepo.FindByID(u.DB, nakesID)
 	if err != nil {
