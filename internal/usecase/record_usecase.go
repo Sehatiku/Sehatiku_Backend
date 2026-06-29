@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sehatiku-backend/internal/entity"
+	"sehatiku-backend/internal/gateway/ml"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/repository"
 	"strings"
@@ -31,10 +32,18 @@ type recordHistoryRepo interface {
 	GetLastLogAt(db *gorm.DB, patientID string) (*time.Time, error)
 }
 
+// recordScorer menghitung health score harian (roll-7 + ML). Di-interface-kan agar
+// RecordUseCase bisa diuji dengan mock; dipenuhi oleh *ScoringUseCase.
+type recordScorer interface {
+	ScorePatient(ctx context.Context, patientID string) (*ml.PredictResult, error)
+}
+
 type RecordUseCase struct {
 	DB          *gorm.DB
 	LogRepo     recordHealthLogRepo
 	HistoryRepo recordHistoryRepo
+	Extractor   foodExtractor // enrich gizi 'meals' lewat NER; boleh nil
+	Scorer      recordScorer  // skor harian setelah catatan tersimpan; boleh nil
 	Log         *zap.Logger
 }
 
@@ -135,14 +144,17 @@ func (u *RecordUseCase) CreateRecord(ctx context.Context, patientID string, req 
 		if len(meals) > foodTextMaxLen {
 			return nil, fmt.Errorf("%w: meals maksimal %d karakter", ErrInvalidHealthLog, foodTextMaxLen)
 		}
-		if err := u.LogRepo.Create(u.DB, &entity.HealthLog{
+		foodLog := &entity.HealthLog{
 			PatientID:  patientID,
 			LoggedBy:   recordLoggedBy,
 			MetricType: "food",
 			ValueText:  &meals,
 			MeasuredAt: recordedAt,
 			Source:     recordSource,
-		}); err != nil {
+		}
+		// Enrich gizi (NER+TKPI) -> value_jsonb supaya makanan ikut dihitung di roll-7.
+		enrichFoodJSONB(ctx, u.Extractor, foodLog, meals, u.Log)
+		if err := u.LogRepo.Create(u.DB, foodLog); err != nil {
 			return nil, fmt.Errorf("inserting food record: %w", err)
 		}
 		created = append(created, "food")
@@ -157,10 +169,31 @@ func (u *RecordUseCase) CreateRecord(ctx context.Context, patientID string, req 
 		zap.Int("metric_count", len(created)),
 	)
 
-	return &model.CreateRecordResponse{
+	resp := &model.CreateRecordResponse{
 		RecordedAt: recordedAt,
 		Created:    created,
-	}, nil
+	}
+
+	// Skor harian (best-effort): roll-7 + ML setelah catatan tersimpan. Bila gagal
+	// (belum ada baseline klinis / ML tak terjangkau), catatan tetap tersimpan dan
+	// `score` di-omit dari response (frontend menampilkan "skor belum tersedia").
+	if u.Scorer != nil {
+		if res, scoreErr := u.Scorer.ScorePatient(ctx, patientID); scoreErr != nil {
+			u.Log.Warn("scoring setelah catatan harian gagal (catatan tetap tersimpan)",
+				zap.String("patient_id", patientID), zap.Error(scoreErr))
+		} else {
+			resp.Score = &model.HealthScoreResponse{
+				HealthScore:  res.HealthScore,
+				Status:       res.Status,
+				StatusLabel:  res.StatusLabel,
+				Message:      res.Message,
+				TopPenalties: res.TopPenalties,
+				ScoredAt:     time.Now(),
+			}
+		}
+	}
+
+	return resp, nil
 }
 
 // GetTodayStatus mengecek status input harian pasien dari sudut pandang WIB:

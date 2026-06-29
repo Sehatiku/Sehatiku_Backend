@@ -18,6 +18,10 @@ type CreateRecordRequest struct {
 type CreateRecordResponse struct {
 	RecordedAt time.Time `json:"recorded_at"`
 	Created    []string  `json:"created"`
+	// Score dihitung setelah catatan tersimpan (roll-7 + ML). Bersifat best-effort:
+	// di-omit (null) bila pasien belum punya baseline klinis atau ML sedang tak
+	// terjangkau — catatan harian tetap tersimpan dan response tetap 201.
+	Score *HealthScoreResponse `json:"score,omitempty"`
 }
 
 // TodayStatusResponse menjawab "apakah pasien sudah mengisi data harian hari ini?".

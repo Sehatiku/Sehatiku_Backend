@@ -198,6 +198,8 @@ func BootStrap(config *BootStrapConfig) {
 		DB:          config.DB,
 		LogRepo:     healthLogRepo,
 		HistoryRepo: patientDashboardRepo,
+		Extractor:   mlGateway, // enrich 'meals' lewat NER+TKPI
+		Scorer:      scoringUC, // kembalikan health score di response /records
 		Log:         config.Log,
 	}
 	patientNotificationUC := &usecase.PatientNotificationUseCase{
