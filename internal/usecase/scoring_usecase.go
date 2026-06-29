@@ -79,10 +79,10 @@ func (u *ScoringUseCase) ScorePatient(ctx context.Context, patientID string) (*m
 		Baseline: ml.Baseline{
 			AgeYears:       scoringAgeFromDOB(patient.DateOfBirth, now),
 			Sex:            patient.Sex, // "male"/"female" — accepted by the ML service
-			BMI:            floatOrZero(baseline.BMI),
-			EGFR:           floatOrZero(baseline.EGFR),
-			HbA1cPct:       floatOrZero(baseline.HbA1c),
-			SystolicBPmmHg: float64(intOrZero(baseline.SystolicBP)),
+			BMI:            baseline.BMI,
+			EGFR:           baseline.EGFR,
+			HbA1cPct:       baseline.HbA1cPct,
+			SystolicBPmmHg: float64(baseline.SystolicBPMmhg),
 		},
 		Daily7DAverage: ml.DailyAverage{
 			GlucoseMeanRoll7: df.GlucoseMeanRoll7,
@@ -141,16 +141,3 @@ func scoringAgeFromDOB(dob *time.Time, now time.Time) int {
 	return years
 }
 
-func floatOrZero(p *float64) float64 {
-	if p != nil {
-		return *p
-	}
-	return 0
-}
-
-func intOrZero(p *int) int {
-	if p != nil {
-		return *p
-	}
-	return 0
-}

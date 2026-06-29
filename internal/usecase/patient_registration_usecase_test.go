@@ -62,6 +62,12 @@ func (m *mockStasher) Stash(_ context.Context, phone string, data repository.Pen
 	return nil
 }
 
+type mockBaselineRepo struct{}
+
+func (m *mockBaselineRepo) Create(_ *gorm.DB, _ *entity.PatientClinicalBaseline) error {
+	return nil
+}
+
 func newPatientRegUC(stasher pendingCredentialStasher, notif notificationRepo) *PatientRegistrationUseCase {
 	return &PatientRegistrationUseCase{
 		DB:                nil,
@@ -69,10 +75,13 @@ func newPatientRegUC(stasher pendingCredentialStasher, notif notificationRepo) *
 		NakesRepo:         &mockRegNakesRepo{faskesID: "faskes-1"},
 		NotificationRepo:  notif,
 		PendingCredential: stasher,
+		BaselineRepo:      &mockBaselineRepo{},
 		WhatsApp:          &whatsapp.WhatsAppGateway{}, // Client nil → BotPhone() == "" (bot belum paired)
 		Log:               zap.NewNop(),
 	}
 }
+
+func boolPtr(b bool) *bool { return &b }
 
 func validPatientReq() *model.PatientRegisterRequest {
 	return &model.PatientRegisterRequest{
@@ -88,6 +97,37 @@ func validPatientReq() *model.PatientRegisterRequest {
 		DiseaseType:     "diabetes_t2",
 		Username:        "budi",
 		Password:        "secret12",
+		Baseline: model.PatientBaselineRequest{
+			AgeYears:              64,
+			Sex:                   "male",
+			BMI:                   24.5,
+			BMICategory:           "normal",
+			WaistCircumferenceCm:  88.0,
+			CentralObesity:        boolPtr(false),
+			SmokingStatus:         "never",
+			AlcoholUse:            boolPtr(false),
+			PhysicalActivity:      "light",
+			FamilyHistoryDiabetes: boolPtr(true),
+			FamilyHistoryCVD:      boolPtr(false),
+			SystolicBPMmhg:        130,
+			DiastolicBPMmhg:       85,
+			HypertensionStatus:    "stage1",
+			FastingGlucoseMgdl:    110.0,
+			HbA1cPct:              6.2,
+			DiabetesStatus:        "prediabetes",
+			TotalCholesterolMgdl:  195.0,
+			HDLMgdl:               48.0,
+			LDLMgdl:               120.0,
+			TriglyceidesMgdl:      150.0,
+			CVDRisk10YrPct:        8.5,
+			CVDRiskCategory:       "moderate",
+			OnAntihypertensive:    boolPtr(false),
+			OnAntidiabetic:        boolPtr(false),
+			OnStatin:              boolPtr(false),
+			TargetRisk:            "moderate",
+			EGFR:                  78.0,
+			UACR:                  12.5,
+		},
 	}
 }
 
