@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"net/http"
+	"sehatiku-backend/internal/gateway/ml"
 	"sehatiku-backend/internal/gateway/ocr"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/repository"
@@ -92,6 +93,31 @@ func mapHealthLogError(ctx *echo.Context, err error) error {
 	case errors.Is(err, usecase.ErrTooManySubmissions):
 		return ctx.JSON(http.StatusTooManyRequests, model.WebResponse[any]{
 			Message: "too many requests",
+			Errors:  err.Error(),
+		})
+	default:
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
+			Message: "internal server error",
+			Errors:  err.Error(),
+		})
+	}
+}
+
+func mapHealthScoreError(ctx *echo.Context, err error) error {
+	switch {
+	case errors.Is(err, usecase.ErrNoBaseline):
+		return ctx.JSON(http.StatusUnprocessableEntity, model.WebResponse[any]{
+			Message: "unprocessable entity",
+			Errors:  "baseline klinis pasien belum tersedia — belum bisa dihitung",
+		})
+	case errors.Is(err, ml.ErrMLUpstream):
+		return ctx.JSON(http.StatusServiceUnavailable, model.WebResponse[any]{
+			Message: "service unavailable",
+			Errors:  err.Error(),
+		})
+	case errors.Is(err, ml.ErrMLUnauthorized), errors.Is(err, ml.ErrMLBadRequest):
+		return ctx.JSON(http.StatusBadGateway, model.WebResponse[any]{
+			Message: "bad gateway",
 			Errors:  err.Error(),
 		})
 	default:

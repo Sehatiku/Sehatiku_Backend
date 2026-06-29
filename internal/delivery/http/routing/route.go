@@ -24,10 +24,11 @@ type RouteConfig struct {
 	DashboardController           *controller.DashboardController
 	PatientDashboardController    *controller.PatientDashboardController
 	HealthLogController           *controller.HealthLogController
+	HealthScoreController         *controller.HealthScoreController
 	AssignedNakesController       *controller.AssignedNakesController
-	ConsultationController          *controller.ConsultationController
-	RecordController                *controller.RecordController
-	PatientNotificationController   *controller.PatientNotificationController
+	ConsultationController        *controller.ConsultationController
+	RecordController              *controller.RecordController
+	PatientNotificationController *controller.PatientNotificationController
 }
 
 func (r *RouteConfig) SetUp() {
@@ -83,6 +84,7 @@ func (r *RouteConfig) SetupPatientAuthedRoute() {
 	g := r.App.Group("/api/v1/patients", middleware.PatientAuth(r.JWTHelper))
 	g.GET("/dashboard", r.PatientDashboardController.GetDashboard)
 	g.POST("/health-logs", r.HealthLogController.Create)
+	g.GET("/health-score", r.HealthScoreController.Get)
 	g.GET("/assigned-nakes", r.AssignedNakesController.GetAssignedNakes)
 	g.POST("/consultations", r.ConsultationController.Create)
 	g.GET("/consultations", r.ConsultationController.GetPatientList)
