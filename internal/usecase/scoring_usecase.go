@@ -21,7 +21,7 @@ var ErrNoBaseline = errors.New("pasien belum memiliki baseline klinis")
 
 type dailyFeatureRepository interface {
 	ComputeRoll7(db *gorm.DB, patientID string, asOf time.Time) (*entity.DailyFeature, error)
-	Create(db *gorm.DB, df *entity.DailyFeature) error
+	Upsert(db *gorm.DB, df *entity.DailyFeature) error
 }
 
 type riskScoreRepository interface {
@@ -56,12 +56,13 @@ type ScoringUseCase struct {
 func (u *ScoringUseCase) ScorePatient(ctx context.Context, patientID string) (*ml.PredictResult, error) {
 	now := time.Now()
 
-	// 1. roll-7 features from health_logs, persisted to daily_features.
+	// 1. roll-7 features from health_logs, persisted to daily_features (1 baris/hari;
+	// upsert agar pemanggilan ulang di hari yang sama meng-update, bukan menggandakan).
 	df, err := u.DailyFeatureRepo.ComputeRoll7(u.DB, patientID, now)
 	if err != nil {
 		return nil, err
 	}
-	if err := u.DailyFeatureRepo.Create(u.DB, df); err != nil {
+	if err := u.DailyFeatureRepo.Upsert(u.DB, df); err != nil {
 		return nil, err
 	}
 
@@ -108,8 +109,8 @@ func (u *ScoringUseCase) ScorePatient(ctx context.Context, patientID string) (*m
 		PatientID:      patientID,
 		DailyFeatureID: df.ID,
 		Score:          int(math.Round(res.HealthScore)), // entity is int; rounds the float
-		Status:         res.Status,                        // aman / waswas / bahaya
-		ScoringMode:    "cohort",                          // XGBoost cohort model
+		Status:         res.Status,                       // aman / waswas / bahaya
+		ScoringMode:    "cohort",                         // XGBoost cohort model
 		// NOTE: SHAP penalties go into top_factors until a dedicated top_penalties
 		// JSONB column exists (see ml-backend-integration-contract action items).
 		TopFactors: penalties,
@@ -140,4 +141,3 @@ func scoringAgeFromDOB(dob *time.Time, now time.Time) int {
 	}
 	return years
 }
-

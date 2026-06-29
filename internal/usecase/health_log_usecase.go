@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sehatiku-backend/internal/entity"
+	"sehatiku-backend/internal/gateway/ml"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/repository"
 	"strings"
@@ -47,10 +48,17 @@ type healthLogGuardRepository interface {
 	ReleaseIdempotency(ctx context.Context, key string) error
 }
 
+// foodExtractor menjalankan teks makanan lewat NER+TKPI di layanan ML (/extract).
+// Di-interface-kan agar usecase bisa diuji dengan mock; boleh nil (enrichment dilewati).
+type foodExtractor interface {
+	ExtractChat(ctx context.Context, text string) (*ml.ExtractResult, error)
+}
+
 type HealthLogUseCase struct {
 	DB            *gorm.DB
 	HealthLogRepo healthLogRepository
 	GuardRepo     healthLogGuardRepository
+	Extractor     foodExtractor // opsional; bila nil, makanan disimpan teks-saja
 	Log           *zap.Logger
 }
 
@@ -93,6 +101,13 @@ func (u *HealthLogUseCase) CreateHealthLog(ctx context.Context, patientID, idemp
 			return nil, fmt.Errorf("loading idempotent health log %s: %w", existingID, err)
 		}
 		return buildHealthLogResponse(existing), nil
+	}
+
+	// Makanan: jalankan lewat NER /extract agar gizi (carbs_g/sodium_mg) tertulis ke
+	// value_jsonb — itulah yang dijumlahkan roll-7 SQL. Tanpa ini, makanan tak pernah
+	// sampai ke model. Degradasi anggun bila ML mati (lihat enrichFood).
+	if req.MetricType == "food" && u.Extractor != nil && log.ValueText != nil {
+		u.enrichFood(ctx, log, *log.ValueText)
 	}
 
 	if err := u.HealthLogRepo.Create(u.DB, log); err != nil {
@@ -193,6 +208,36 @@ func setFood(req *model.CreateHealthLogRequest, log *entity.HealthLog) error {
 	// value_jsonb (hasil NER makanan) sengaja dibiarkan null — parsing NER di luar scope endpoint ini.
 	log.ValueText = &text
 	return nil
+}
+
+// enrichFood menjalankan teks makanan lewat NER+TKPI (ML /extract) dan menulis gizi
+// teragregasi ke value_jsonb. Kunci `carbs_g`/`sodium_mg` harus persis — dibaca oleh
+// roll-7 SQL (daily_feature_repository.roll7SQL). Vital (gula/tensi) dari hasil extract
+// sengaja diabaikan: pasien mencatatnya lewat metric_type tersendiri. Bila ML tak
+// terjangkau, log tetap tersimpan teks-saja (value_jsonb null) dan request tetap sukses —
+// gizi belum terhitung sampai di-enrich ulang.
+func (u *HealthLogUseCase) enrichFood(ctx context.Context, log *entity.HealthLog, text string) {
+	res, err := u.Extractor.ExtractChat(ctx, text)
+	if err != nil {
+		u.Log.Warn("enrichment makanan dilewati (ML tidak terjangkau)",
+			zap.String("patient_id", log.PatientID), zap.Error(err))
+		return
+	}
+	payload := map[string]any{
+		"name":      text,
+		"carbs_g":   res.Totals.CarbsG,
+		"sodium_mg": res.Totals.SodiumMg,
+		"kcal":      res.Totals.Kcal,
+		"items":     res.Foods,
+		"unmatched": res.UnmatchedFoods,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		u.Log.Warn("gagal marshal value_jsonb makanan", zap.String("patient_id", log.PatientID), zap.Error(err))
+		return
+	}
+	s := string(raw)
+	log.ValueJSONB = &s
 }
 
 func parseMeasuredAt(raw string) (time.Time, error) {

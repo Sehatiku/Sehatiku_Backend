@@ -4,6 +4,7 @@ import (
 	"sehatiku-backend/internal/delivery/http/controller"
 	"sehatiku-backend/internal/delivery/http/routing"
 	wadelivery "sehatiku-backend/internal/delivery/whatsapp"
+	mlgw "sehatiku-backend/internal/gateway/ml"
 	ocrgw "sehatiku-backend/internal/gateway/ocr"
 	"sehatiku-backend/internal/gateway/whatsapp"
 	"sehatiku-backend/internal/helper"
@@ -54,6 +55,14 @@ func BootStrap(config *BootStrapConfig) {
 	ktpOCRGateway := ocrgw.New(
 		config.Config.GetString("KTP_OCR_API_KEY"),
 		ktpOCRBaseURL,
+		config.Log,
+	)
+
+	// ML inference service (NER+TKPI /extract, XGBoost+SHAP /predict_health_score),
+	// dideploy terpisah (HF Space). ML_API_KEY dikirim sebagai header X-API-Key.
+	mlGateway := mlgw.New(
+		config.Config.GetString("ML_API_BASE_URL"),
+		config.Config.GetString("ML_API_KEY"),
 		config.Log,
 	)
 
@@ -155,7 +164,21 @@ func BootStrap(config *BootStrapConfig) {
 		DB:            config.DB,
 		HealthLogRepo: healthLogRepo,
 		GuardRepo:     healthLogGuardRepo,
+		Extractor:     mlGateway, // makanan di-enrich lewat NER+TKPI saat dicatat
 		Log:           config.Log,
+	}
+
+	// Skoring harian: roll-7 (SQL) -> daily_features -> ML /predict -> risk_scores.
+	dailyFeatureRepo := &repository.DailyFeatureRepository{}
+	riskScoreRepo := &repository.RiskScoreRepository{}
+	scoringUC := &usecase.ScoringUseCase{
+		DB:               config.DB,
+		DailyFeatureRepo: dailyFeatureRepo,
+		RiskScoreRepo:    riskScoreRepo,
+		PatientRepo:      patientRepo,
+		BaselineRepo:     patientClinicalBaselineRepo,
+		ML:               mlGateway,
+		Log:              config.Log,
 	}
 	assignedNakesUC := &usecase.AssignedNakesUseCase{
 		DB:          config.DB,
@@ -199,6 +222,7 @@ func BootStrap(config *BootStrapConfig) {
 	}
 	patientDashboardCtrl := &controller.PatientDashboardController{UseCase: patientDashboardUC}
 	healthLogCtrl := &controller.HealthLogController{UseCase: healthLogUC}
+	healthScoreCtrl := &controller.HealthScoreController{UseCase: scoringUC}
 	assignedNakesCtrl := &controller.AssignedNakesController{UseCase: assignedNakesUC}
 	consultationCtrl := &controller.ConsultationController{UseCase: consultationUC}
 	recordCtrl := &controller.RecordController{UseCase: recordUC}
@@ -221,10 +245,11 @@ func BootStrap(config *BootStrapConfig) {
 		DashboardController:           dashboardCtrl,
 		PatientDashboardController:    patientDashboardCtrl,
 		HealthLogController:           healthLogCtrl,
+		HealthScoreController:         healthScoreCtrl,
 		AssignedNakesController:       assignedNakesCtrl,
-		ConsultationController:          consultationCtrl,
-		RecordController:                recordCtrl,
-		PatientNotificationController:   patientNotificationCtrl,
+		ConsultationController:        consultationCtrl,
+		RecordController:              recordCtrl,
+		PatientNotificationController: patientNotificationCtrl,
 	}
 	routeConfig.SetUp()
 }

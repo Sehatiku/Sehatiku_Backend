@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -32,11 +33,13 @@ const (
 // food nutrition summed per day from value_jsonb (only NER-enriched food logs that
 // carry carbs_g/sodium_mg contribute — text-only food logs do not).
 //
-// UNIT CAVEATS (need calibration before trusting the score in production):
-//   - activity: health_logs stores MINUTES/day (0..1440); the model was trained on a
-//     0..1 activity fraction, so we divide by 1440 here as a rough proxy.
-//   - stress:   health_logs uses a 1..10 scale; the model's training distribution was
-//     wider (~0..80). This is passed through unscaled — revisit once calibrated.
+// UNIT CALIBRATION — menyelaraskan satuan app ke distribusi data latih model
+// (diverifikasi atas Dataset-Simulation/sim_timeseries_365k_v3.csv):
+//   - activity: app mencatat MENIT/hari; fitur latih `activity_30m` BINER (1 bila
+//     >=30 menit/hari, selain itu 0) dan input model = fraksi hari aktif (0..1,
+//     rata-rata ~0.33). Kita jumlahkan menit per hari, tandai >=30 menit, lalu rata2.
+//   - stress: app skala 1..10; `stress_mean` data latih ~0..82 (rata-rata ~20.8).
+//     Di-rescale linear: model = (app-1)/9 * 82  (app 1->0, app 10->82).
 const roll7SQL = `
 WITH win AS (
     SELECT metric_type, value_numeric, value_jsonb, measured_at
@@ -53,6 +56,13 @@ food_daily AS (
     WHERE metric_type = 'food' AND value_jsonb IS NOT NULL
     GROUP BY 1
 ),
+activity_daily AS (
+    SELECT measured_at::date AS d,
+           CASE WHEN SUM(value_numeric) >= 30 THEN 1.0 ELSE 0.0 END AS active
+    FROM win
+    WHERE metric_type = 'activity'
+    GROUP BY 1
+),
 g AS (
     SELECT AVG(value_numeric) AS mean, STDDEV_SAMP(value_numeric) AS sd
     FROM win WHERE metric_type = 'glucose'
@@ -65,8 +75,8 @@ SELECT
     (SELECT AVG(sodium) FROM food_daily) AS sodium_roll7,
     (SELECT AVG(carbs)  FROM food_daily) AS carbs_roll7,
     AVG(value_numeric) FILTER (WHERE metric_type = 'sleep') AS sleep_roll7,
-    (AVG(value_numeric) FILTER (WHERE metric_type = 'activity')) / 1440.0 AS activity_pct_roll7,
-    AVG(value_numeric) FILTER (WHERE metric_type = 'stress') AS stress_roll7
+    (SELECT AVG(active) FROM activity_daily) AS activity_pct_roll7,
+    AVG(((value_numeric - 1) / 9.0) * 82.0) FILTER (WHERE metric_type = 'stress') AS stress_roll7
 FROM win
 `
 
@@ -109,6 +119,42 @@ func (r *DailyFeatureRepository) Create(db *gorm.DB, df *entity.DailyFeature) er
 		return fmt.Errorf("creating daily feature: %w", err)
 	}
 	return nil
+}
+
+// Upsert menyimpan fitur hari ini dengan menghormati UNIQUE(patient_id, feature_date):
+// 1 baris/pasien/hari. Bila skoring on-demand dipanggil berkali-kali di hari yang sama,
+// baris yang ada DI-UPDATE (bukan insert baru yang akan melanggar unique). df.ID di-set
+// ke id baris riil agar risk_scores.daily_feature_id (FK) menunjuk ke baris yang benar.
+func (r *DailyFeatureRepository) Upsert(db *gorm.DB, df *entity.DailyFeature) error {
+	day := df.FeatureDate.Format("2006-01-02")
+	var existing entity.DailyFeature
+	err := db.Where("patient_id = ? AND feature_date = ?::date", df.PatientID, day).First(&existing).Error
+	switch {
+	case err == nil:
+		df.ID = existing.ID
+		// Map (bukan struct) supaya nilai nol (mis. activity_pct_roll7 = 0) tetap ditulis.
+		updates := map[string]any{
+			"glucose_mean_roll7": df.GlucoseMeanRoll7,
+			"glucose_cv_roll7":   df.GlucoseCVRoll7,
+			"systolic_roll7":     df.SystolicRoll7,
+			"sodium_roll7":       df.SodiumRoll7,
+			"sleep_roll7":        df.SleepRoll7,
+			"activity_pct_roll7": df.ActivityPctRoll7,
+			"stress_roll7":       df.StressRoll7,
+			"carbs_roll7":        df.CarbsRoll7,
+		}
+		if err := db.Model(&entity.DailyFeature{}).Where("id = ?", existing.ID).Updates(updates).Error; err != nil {
+			return fmt.Errorf("updating daily feature: %w", err)
+		}
+		return nil
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		if err := db.Create(df).Error; err != nil {
+			return fmt.Errorf("creating daily feature: %w", err)
+		}
+		return nil
+	default:
+		return fmt.Errorf("looking up daily feature: %w", err)
+	}
 }
 
 func orDefault(v sql.NullFloat64, def float64) float64 {
