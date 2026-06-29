@@ -108,6 +108,21 @@ func (g *WhatsAppGateway) SendCompanionRegistrationCredentials(ctx context.Conte
 	return nil
 }
 
+// SendConsultationReply notifies the patient that their doctor has replied to their
+// consultation. Dipanggil fire-and-forget — error hanya di-log, tidak dipropagasi.
+func (g *WhatsAppGateway) SendConsultationReply(ctx context.Context, toPhone, patientName, nakesNote string) error {
+	text := fmt.Sprintf(
+		"💬 *Sehatiku — Balasan Dokter*\n\nHalo %s 👋\n\nDokter Anda telah membalas keluhan Anda:\n\n_%s_\n\nSilakan cek aplikasi Sehatiku untuk melihat rincian selengkapnya 📱",
+		patientName,
+		nakesNote,
+	)
+	if err := g.sendText(ctx, toPhone, text); err != nil {
+		return fmt.Errorf("sending wa consultation reply to %s: %w", toPhone, err)
+	}
+	g.Log.Info("wa consultation reply sent", zap.String("to", toPhone))
+	return nil
+}
+
 // sendText adalah helper internal untuk mengirim pesan teks biasa ke satu nomor WA.
 func (g *WhatsAppGateway) sendText(ctx context.Context, toPhone, text string) error {
 	if g.Client == nil {

@@ -25,6 +25,7 @@ var ErrNIKAlreadyExists = errors.New("NIK sudah terdaftar")
 type NakesRegistrationUseCase struct {
 	DB                *gorm.DB
 	NakesRepo         nakesRepo
+	FaskesRepo        nakesRegFaskesRepo
 	NotificationRepo  notificationRepo
 	PendingCredential pendingCredentialStasher
 	OCRGateway        *ocr.KTPOCRGateway
@@ -38,6 +39,10 @@ type nakesRepo interface {
 	Create(db *gorm.DB, entity *entity.Nakes) error
 }
 
+type nakesRegFaskesRepo interface {
+	FindByID(db *gorm.DB, id string) (*entity.Faskes, error)
+}
+
 func (u *NakesRegistrationUseCase) ScanKTP(ctx context.Context, file multipart.File, filename string) (*model.KTPOCRResponse, error) {
 	result, err := u.OCRGateway.ExtractKTP(ctx, file, filename)
 	if err != nil {
@@ -47,7 +52,12 @@ func (u *NakesRegistrationUseCase) ScanKTP(ctx context.Context, file multipart.F
 }
 
 func (u *NakesRegistrationUseCase) RegisterNakes(ctx context.Context, faskesID string, req *model.NakesRegisterRequest) (*model.NakesRegisterResponse, error) {
-	_, err := u.NakesRepo.FindByNIK(u.DB, req.NIK)
+	faskes, err := u.FaskesRepo.FindByID(u.DB, faskesID)
+	if err != nil {
+		return nil, fmt.Errorf("loading faskes: %w", err)
+	}
+
+	_, err = u.NakesRepo.FindByNIK(u.DB, req.NIK)
 	if err == nil {
 		return nil, ErrNIKAlreadyExists
 	}
@@ -68,6 +78,7 @@ func (u *NakesRegistrationUseCase) RegisterNakes(ctx context.Context, faskesID s
 		return nil, fmt.Errorf("hashing password: %w", err)
 	}
 
+	hospitalName := faskes.Name
 	now := time.Now()
 	nakes := &entity.Nakes{
 		FaskesID:       faskesID,
@@ -81,7 +92,7 @@ func (u *NakesRegistrationUseCase) RegisterNakes(ctx context.Context, faskesID s
 		Status:         entity.NakesStatusActive,
 		EnrolledAt:     now,
 		Specialization: req.Specialization,
-		Hospital:       req.Hospital,
+		Hospital:       &hospitalName,
 	}
 	if len(req.Schedule) > 0 {
 		scheduleJSON, err := json.Marshal(req.Schedule)
