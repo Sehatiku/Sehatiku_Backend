@@ -41,6 +41,17 @@ const (
 // logDateWindowDays membatasi pengambilan tanggal log untuk perhitungan streak.
 const logDateWindowDays = 60
 
+// wibLocation adalah zona waktu Asia/Jakarta (WIB), dipakai untuk menentukan "hari ini"
+// dari sudut pandang pasien Indonesia, bukan timezone server. Fallback ke UTC+7 statis
+// kalau database timezone tidak tersedia di sistem.
+var wibLocation = func() *time.Location {
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		return time.FixedZone("WIB", 7*60*60)
+	}
+	return loc
+}()
+
 type patientDashboardRepo interface {
 	GetLatestRisk(db *gorm.DB, patientID string) (*repository.PatientRiskRow, error)
 	GetLatestGlucose(db *gorm.DB, patientID string) (*repository.GlucoseRow, error)
@@ -103,7 +114,7 @@ func (u *PatientDashboardUseCase) GetDashboard(ctx context.Context, patientID st
 		return nil, fmt.Errorf("patient dashboard log dates: %w", err)
 	}
 
-	loggedToday, streak := computeStreak(logDates, time.Now())
+	loggedToday, streak := computeStreak(logDates, time.Now().In(wibLocation))
 
 	resp := &model.PatientDashboardResponse{
 		Profile: model.PatientDashboardProfile{
