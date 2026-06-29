@@ -11,11 +11,26 @@ import (
 type nakesUseCase interface {
 	ListNakes(ctx context.Context, faskesID string) ([]model.NakesListItem, error)
 	GetNakesDetail(ctx context.Context, faskesID, nakesID string) (*model.NakesDetailResponse, error)
+	GetMyProfile(ctx context.Context, nakesID string) (*model.NakesDetailResponse, error)
 	UpdateNakesStatus(ctx context.Context, faskesID, nakesID string, req *model.UpdateNakesStatusRequest) (*model.UpdateNakesStatusResponse, error)
 }
 
 type NakesController struct {
 	UseCase nakesUseCase
+}
+
+func (c *NakesController) GetMyProfile(ctx *echo.Context) error {
+	claims := getNakesClaimsFromCtx(ctx)
+
+	detail, err := c.UseCase.GetMyProfile(ctx.Request().Context(), claims.NakesID)
+	if err != nil {
+		return mapNakesError(ctx, err)
+	}
+
+	return ctx.JSON(http.StatusOK, model.WebResponse[*model.NakesDetailResponse]{
+		Message: "detail profil berhasil diambil",
+		Data:    detail,
+	})
 }
 
 func (c *NakesController) ListNakes(ctx *echo.Context) error {

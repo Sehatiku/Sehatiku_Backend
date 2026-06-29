@@ -66,6 +66,7 @@ func (r *RouteConfig) SetupNakesGuestRoute() {
 
 func (r *RouteConfig) SetupNakesAuthedRoute() {
 	g := r.App.Group("/api/v1/nakes", middleware.NakesAuth(r.JWTHelper))
+	g.GET("/profile", r.NakesController.GetMyProfile)
 	g.GET("/dashboard/summary", r.DashboardController.GetSummary)
 	g.GET("/dashboard/patient-queue", r.DashboardController.GetPatientQueue)
 }
