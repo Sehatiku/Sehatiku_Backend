@@ -70,16 +70,25 @@ func (u *NakesRegistrationUseCase) RegisterNakes(ctx context.Context, faskesID s
 
 	now := time.Now()
 	nakes := &entity.Nakes{
-		FaskesID:     faskesID,
-		Username:     req.Username,
-		PasswordHash: string(hash),
-		FullName:     req.FullName,
-		Role:         req.Role,
-		NIK:          req.NIK,
-		Alamat:       req.Alamat,
-		PhoneNumber:  req.PhoneNumber,
-		Status:       entity.NakesStatusActive,
-		EnrolledAt:   now,
+		FaskesID:       faskesID,
+		Username:       req.Username,
+		PasswordHash:   string(hash),
+		FullName:       req.FullName,
+		Role:           req.Role,
+		NIK:            req.NIK,
+		Alamat:         req.Alamat,
+		PhoneNumber:    req.PhoneNumber,
+		Status:         entity.NakesStatusActive,
+		EnrolledAt:     now,
+		Specialization: req.Specialization,
+		Hospital:       req.Hospital,
+	}
+	if len(req.Schedule) > 0 {
+		scheduleJSON, err := json.Marshal(req.Schedule)
+		if err == nil {
+			s := string(scheduleJSON)
+			nakes.Schedule = &s
+		}
 	}
 
 	if err := u.NakesRepo.Create(u.DB, nakes); err != nil {

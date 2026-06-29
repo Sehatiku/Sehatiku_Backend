@@ -15,13 +15,16 @@ type KTPOCRResponse struct {
 // ── Nakes Registration ───────────────────────────────────────────────────────
 
 type NakesRegisterRequest struct {
-	NIK         string `json:"nik"          validate:"required"`
-	FullName    string `json:"full_name"    validate:"required"`
-	Alamat      string `json:"alamat"       validate:"required"`
-	PhoneNumber string `json:"phone_number" validate:"required"`
-	Role        string `json:"role"         validate:"required,oneof=dokter kader admin"`
-	Username    string `json:"username"     validate:"required,min=4,max=50"`
-	Password    string `json:"password"     validate:"required,min=8"`
+	NIK            string          `json:"nik"             validate:"required"`
+	FullName       string          `json:"full_name"       validate:"required"`
+	Alamat         string          `json:"alamat"          validate:"required"`
+	PhoneNumber    string          `json:"phone_number"    validate:"required"`
+	Role           string          `json:"role"            validate:"required,oneof=dokter kader admin"`
+	Username       string          `json:"username"        validate:"required,min=4,max=50"`
+	Password       string          `json:"password"        validate:"required,min=8"`
+	Specialization *string         `json:"specialization"`
+	Hospital       *string         `json:"hospital"`
+	Schedule       []ScheduleEntry `json:"schedule"`
 }
 
 type NakesRegisterResponse struct {
