@@ -1,4 +1,0 @@
--- PostgreSQL does not support removing enum values (no ALTER TYPE ... DROP VALUE).
--- Reversing this migration would require dropping and recreating the comm_channel type
--- along with every column that depends on it — too disruptive for a down migration.
--- This is intentionally a no-op; remove 'in_app' usages from data manually if needed.

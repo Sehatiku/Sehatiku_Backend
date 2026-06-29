@@ -35,6 +35,7 @@ func BootStrap(config *BootStrapConfig) {
 	nakesRepo := &repository.NakesRepository{}
 	patientRepo := &repository.PatientRepository{}
 	notificationRepo := &repository.NotificationRepository{}
+	patientNotificationRepo := &repository.PatientNotificationRepository{}
 	sessionRepo := &repository.SessionRepository{
 		Redis: config.Redis,
 		Log:   config.Log,
@@ -165,7 +166,7 @@ func BootStrap(config *BootStrapConfig) {
 		Repo:        consultationRepo,
 		PatientRepo: patientRepo,
 		NakesRepo:   nakesRepo,
-		NotifRepo:   notificationRepo,
+		InboxRepo:   patientNotificationRepo,
 		Log:         config.Log,
 	}
 	recordUC := &usecase.RecordUseCase{
@@ -176,7 +177,7 @@ func BootStrap(config *BootStrapConfig) {
 	}
 	patientNotificationUC := &usecase.PatientNotificationUseCase{
 		DB:        config.DB,
-		NotifRepo: notificationRepo,
+		NotifRepo: patientNotificationRepo,
 		Log:       config.Log,
 	}
 

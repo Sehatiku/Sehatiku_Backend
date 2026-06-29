@@ -27,8 +27,11 @@ type consultationNakesRepo interface {
 	FindByID(db *gorm.DB, id string) (*entity.Nakes, error)
 }
 
-type consultationNotifRepo interface {
-	Create(db *gorm.DB, n *entity.Notification) error
+// consultationInboxRepo membuat notifikasi inbox in-app pasien (tabel patient_notifications),
+// BUKAN baris transport WA/SMS. Pemisahan ini menghilangkan kebingungan lama saat reply
+// dokter ditumpangkan ke tabel `notifications` dengan channel=in_app palsu.
+type consultationInboxRepo interface {
+	Create(db *gorm.DB, n *entity.PatientNotification) error
 }
 
 type ConsultationUseCase struct {
@@ -36,7 +39,7 @@ type ConsultationUseCase struct {
 	Repo        consultationRepo
 	PatientRepo consultationPatientRepo
 	NakesRepo   consultationNakesRepo
-	NotifRepo   consultationNotifRepo
+	InboxRepo   consultationInboxRepo
 	Log         *zap.Logger
 }
 
@@ -102,24 +105,25 @@ func (u *ConsultationUseCase) ReplyConsultation(ctx context.Context, consultatio
 		zap.String("nakes_id", nakesID),
 	)
 
-	// Resolve nakes name for the notification payload. Fall back to nakes_id if lookup fails.
+	// Resolve nakes name for the inbox payload. Fall back to nakes_id if lookup fails.
 	nakesName := nakesID
 	if nakes, err := u.NakesRepo.FindByID(u.DB, nakesID); err == nil {
 		nakesName = nakes.FullName
 	}
 
-	// Create in-app notification for the patient. Non-critical: log and continue on failure.
-	notif := &entity.Notification{
-		PatientID:      &c.PatientID,
-		RecipientPhone: "",
-		RecipientRole:  entity.RecipientRolePatient,
-		MessageType:    entity.MessageTypeConsultationReply,
-		Channel:        entity.NotificationChannelInApp,
-		Payload:        fmt.Sprintf(`{"consultation_id":%q,"nakes_name":%q,"nakes_note":%q}`, consultationID, nakesName, req.NakesNote),
-		Status:         entity.NotificationStatusSent,
-		QueuedAt:       now,
+	// Tulis ke inbox in-app pasien (patient_notifications). Non-kritis: gagal hanya di-log,
+	// reply tetap dianggap sukses (fire-and-forget, konsisten dgn perilaku lama).
+	payload := fmt.Sprintf(`{"nakes_name":%q}`, nakesName)
+	consultationIDRef := consultationID
+	notif := &entity.PatientNotification{
+		PatientID:      c.PatientID,
+		Type:           entity.PatientNotifTypeConsultationReply,
+		Title:          "Balasan dari dokter",
+		Body:           req.NakesNote,
+		Payload:        &payload,
+		ConsultationID: &consultationIDRef,
 	}
-	if dbErr := u.NotifRepo.Create(u.DB, notif); dbErr != nil {
+	if dbErr := u.InboxRepo.Create(u.DB, notif); dbErr != nil {
 		u.Log.Warn("failed to create in-app notification for consultation reply",
 			zap.String("consultation_id", consultationID),
 			zap.String("patient_id", c.PatientID),
