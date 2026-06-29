@@ -90,6 +90,9 @@ func (r *RouteConfig) SetupPatientAuthedRoute() {
 	g.GET("/records/history", r.RecordController.GetHistory)
 	g.GET("/records/today-status", r.RecordController.GetTodayStatus)
 	g.GET("/notifications", r.PatientNotificationController.GetNotifications)
+	g.GET("/notifications/unread-count", r.PatientNotificationController.GetUnreadCount)
+	g.POST("/notifications/read-all", r.PatientNotificationController.MarkAllRead)
+	g.PATCH("/notifications/:id/read", r.PatientNotificationController.MarkRead)
 }
 
 func (r *RouteConfig) SetupTokenRoute() {

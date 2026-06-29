@@ -38,11 +38,9 @@ const (
 	NotificationStatusSent   = "sent"
 	NotificationStatusFailed = "failed"
 
-	MessageTypeCredentialBlast  = "credential_blast"
-	MessageTypeConsultationReply = "consultation_reply"
+	MessageTypeCredentialBlast = "credential_blast"
 
 	NotificationChannelWhatsApp = "whatsapp"
-	NotificationChannelInApp    = "in_app"
 
 	RecipientRolePatient   = "patient"
 	RecipientRoleCompanion = "companion"

@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"fmt"
 	"time"
 
 	"sehatiku-backend/internal/entity"
@@ -9,23 +8,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// NotificationRepository menyimpan catatan pesan keluar (audit transport WA/SMS).
-// Memakai operasi generik Create/Update dari Repository[T]; belum ada query khusus
-// karena retry worker / endpoint listing belum dibuat (lihat docs erd: kolom
-// status & retry_count sudah siap bila nanti dibutuhkan).
+// NotificationRepository menyimpan catatan pesan keluar (audit transport WA/SMS murni:
+// credential_blast, daily_prompt, escalation, recommendation, system). Inbox in-app pasien
+// TIDAK lagi di sini — sudah dipindah ke PatientNotificationRepository (tabel
+// patient_notifications). Memakai operasi generik Create/Update dari Repository[T].
 type NotificationRepository struct {
 	Repository[entity.Notification]
-}
-
-// FindInAppByPatientID mengembalikan semua notifikasi in-app milik pasien, terbaru dulu.
-func (r *NotificationRepository) FindInAppByPatientID(db *gorm.DB, patientID string) ([]entity.Notification, error) {
-	var rows []entity.Notification
-	if err := db.Where("patient_id = ? AND channel = ?", patientID, entity.NotificationChannelInApp).
-		Order("created_at DESC").
-		Find(&rows).Error; err != nil {
-		return nil, fmt.Errorf("finding in-app notifications for patient %s: %w", patientID, err)
-	}
-	return rows, nil
 }
 
 // MarkStatus memperbarui status satu baris notifikasi berdasarkan id tanpa harus memuat
