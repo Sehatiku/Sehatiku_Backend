@@ -8,6 +8,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// Nilai kolom risk_scores.status — hindari magic string (be_implementation §3).
+const (
+	RiskStatusAman   = "aman"
+	RiskStatusWaswas = "waswas"
+	RiskStatusBahaya = "bahaya"
+)
+
 type RiskScore struct {
 	ID             string          `gorm:"column:id;primaryKey"`
 	PatientID      string          `gorm:"column:patient_id"`

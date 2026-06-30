@@ -12,6 +12,7 @@ import (
 type patientUseCase interface {
 	ListPatients(ctx context.Context, faskesID string, page, size int) ([]model.PatientListItem, model.PageMetadata, error)
 	GetPatientDetail(ctx context.Context, faskesID, patientID string) (*model.PatientDetailResponse, error)
+	GetNakesPatientDetail(ctx context.Context, faskesID, nakesID, patientID string) (*model.NakesPatientDetailResponse, error)
 }
 
 type PatientController struct {
@@ -63,6 +64,28 @@ func (c *PatientController) GetPatientDetail(ctx *echo.Context) error {
 
 	return ctx.JSON(http.StatusOK, model.WebResponse[*model.PatientDetailResponse]{
 		Message: "detail pasien berhasil diambil",
+		Data:    detail,
+	})
+}
+
+func (c *PatientController) GetNakesPatientDetail(ctx *echo.Context) error {
+	claims := getNakesClaimsFromCtx(ctx)
+
+	patientID := ctx.Param("id")
+	if patientID == "" {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
+			Message: "bad request",
+			Errors:  "patient id wajib diisi",
+		})
+	}
+
+	detail, err := c.UseCase.GetNakesPatientDetail(ctx.Request().Context(), claims.FaskesID, claims.NakesID, patientID)
+	if err != nil {
+		return mapPatientError(ctx, err)
+	}
+
+	return ctx.JSON(http.StatusOK, model.WebResponse[*model.NakesPatientDetailResponse]{
+		Message: "detail pasien untuk nakes berhasil diambil",
 		Data:    detail,
 	})
 }

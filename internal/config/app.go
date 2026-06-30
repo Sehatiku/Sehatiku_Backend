@@ -47,6 +47,7 @@ func BootStrap(config *BootStrapConfig) {
 		Log:   config.Log,
 	}
 	patientClinicalBaselineRepo := &repository.PatientClinicalBaselineRepository{}
+	escalationRepo := &repository.EscalationRepository{}
 
 	// Gateways
 	ktpOCRBaseURL := config.Config.GetString("KTP_OCR_BASE_URL")
@@ -121,11 +122,17 @@ func BootStrap(config *BootStrapConfig) {
 		NakesRepo: nakesRepo,
 		Log:       config.Log,
 	}
+	patientDashboardRepo := &repository.PatientDashboardRepository{}
+	riskScoreRepo := &repository.RiskScoreRepository{}
+
 	patientUC := &usecase.PatientUseCase{
-		DB:          config.DB,
-		PatientRepo: patientRepo,
-		NakesRepo:   nakesRepo,
-		Log:         config.Log,
+		DB:            config.DB,
+		PatientRepo:   patientRepo,
+		NakesRepo:     nakesRepo,
+		BaselineRepo:  patientClinicalBaselineRepo,
+		HistoryRepo:   patientDashboardRepo,
+		RiskScoreRepo: riskScoreRepo,
+		Log:           config.Log,
 	}
 	patientRegUC := &usecase.PatientRegistrationUseCase{
 		DB:                config.DB,
@@ -155,7 +162,7 @@ func BootStrap(config *BootStrapConfig) {
 		DashboardRepo: dashboardRepo,
 		Log:           config.Log,
 	}
-	patientDashboardRepo := &repository.PatientDashboardRepository{}
+
 	patientDashboardUC := &usecase.PatientDashboardUseCase{
 		DB:          config.DB,
 		Repo:        patientDashboardRepo,
@@ -178,7 +185,7 @@ func BootStrap(config *BootStrapConfig) {
 
 	// Skoring harian: roll-7 (SQL) -> daily_features -> ML /predict -> risk_scores.
 	dailyFeatureRepo := &repository.DailyFeatureRepository{}
-	riskScoreRepo := &repository.RiskScoreRepository{}
+
 	scoringUC := &usecase.ScoringUseCase{
 		DB:               config.DB,
 		DailyFeatureRepo: dailyFeatureRepo,
@@ -188,6 +195,14 @@ func BootStrap(config *BootStrapConfig) {
 		ML:               mlGateway,
 		Log:              config.Log,
 	}
+	escalationUC := &usecase.EscalationUseCase{
+		DB:       config.DB,
+		Repo:     escalationRepo,
+		RiskRepo: riskScoreRepo,
+		Log:      config.Log,
+	}
+	// Acute escalation hook — scoring fires it fire-and-forget after persisting a risk score.
+	scoringUC.Escalation = escalationUC
 	assignedNakesUC := &usecase.AssignedNakesUseCase{
 		DB:          config.DB,
 		PatientRepo: patientRepo,
@@ -256,6 +271,7 @@ func BootStrap(config *BootStrapConfig) {
 	patientNotificationCtrl := &controller.PatientNotificationController{UseCase: patientNotificationUC}
 	summaryCtrl := &controller.SummaryController{UseCase: summaryUC}
 	baselineCtrl := &controller.BaselineController{UseCase: baselineUC}
+	escalationCtrl := &controller.EscalationController{UseCase: escalationUC}
 
 	config.App.Validator = &CustomValidator{validator: config.Validate}
 
@@ -281,6 +297,7 @@ func BootStrap(config *BootStrapConfig) {
 		PatientNotificationController: patientNotificationCtrl,
 		SummaryController:             summaryCtrl,
 		BaselineController:            baselineCtrl,
+		EscalationController:          escalationCtrl,
 	}
 	routeConfig.SetUp()
 }
