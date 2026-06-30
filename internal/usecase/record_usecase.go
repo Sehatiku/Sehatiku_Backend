@@ -222,6 +222,22 @@ func (u *RecordUseCase) GetTodayStatus(ctx context.Context, patientID string) (*
 	return resp, nil
 }
 
+// GetLoggedToday adalah endpoint ringan yang hanya mengembalikan satu boolean:
+// true jika pasien sudah mempunyai minimal satu health_log hari ini (WIB), false jika belum.
+// Berbeda dari GetTodayStatus yang mengembalikan konteks tambahan (days_since_last_log, dll),
+// endpoint ini dipakai ketika mobile hanya butuh jawaban ya/tidak secara efisien.
+func (u *RecordUseCase) GetLoggedToday(ctx context.Context, patientID string) (bool, error) {
+	lastAt, err := u.HistoryRepo.GetLastLogAt(u.DB, patientID)
+	if err != nil {
+		return false, fmt.Errorf("getting logged-today for patient %s: %w", patientID, err)
+	}
+	if lastAt == nil {
+		return false, nil
+	}
+	now := time.Now().In(wibLocation)
+	return daysBetween(lastAt.In(wibLocation), now) == 0, nil
+}
+
 // daysBetween menghitung selisih hari kalender antara `earlier` dan `later`.
 // Keduanya harus sudah berada di zona waktu yang sama (mis. WIB). WIB tidak memiliki DST
 // sehingga selisih selalu kelipatan 24 jam tepat.

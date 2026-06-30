@@ -104,6 +104,7 @@ func (r *RouteConfig) SetupPatientAuthedRoute() {
 	g.POST("/records", r.RecordController.Create)
 	g.GET("/records/history", r.RecordController.GetHistory)
 	g.GET("/records/today-status", r.RecordController.GetTodayStatus)
+	g.GET("/records/logged-today", r.RecordController.GetLoggedToday)
 	g.GET("/baseline/history", r.BaselineController.GetMyHistory)
 	g.GET("/notifications", r.PatientNotificationController.GetNotifications)
 	g.GET("/notifications/unread-count", r.PatientNotificationController.GetUnreadCount)
