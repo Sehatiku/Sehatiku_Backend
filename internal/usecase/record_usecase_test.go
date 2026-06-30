@@ -16,11 +16,12 @@ import (
 // tanpa menyentuh database.
 type mockRecordHistoryRepo struct {
 	lastAt *time.Time
+	rows   []repository.RecordHistoryRaw
 	err    error
 }
 
 func (m *mockRecordHistoryRepo) GetRecordHistory(_ *gorm.DB, _ string, _ int) ([]repository.RecordHistoryRaw, error) {
-	return nil, nil
+	return m.rows, m.err
 }
 
 func (m *mockRecordHistoryRepo) GetLastLogAt(_ *gorm.DB, _ string) (*time.Time, error) {
@@ -102,6 +103,39 @@ func TestGetTodayStatus_RepoError(t *testing.T) {
 
 	if _, err := uc.GetTodayStatus(context.Background(), "patient-1"); err == nil {
 		t.Fatal("expected error when repo fails, got nil")
+	}
+}
+
+func TestGetHistory_IncludesHealthScoreWhenAvailable(t *testing.T) {
+	score := 82
+	glucose := 75.0
+	weight := 64.0
+	uc := &RecordUseCase{
+		HistoryRepo: &mockRecordHistoryRepo{
+			rows: []repository.RecordHistoryRaw{
+				{
+					LogDate:     time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC),
+					BloodSugar:  &glucose,
+					Weight:      &weight,
+					HealthScore: &score,
+				},
+			},
+		},
+		Log: zap.NewNop(),
+	}
+
+	items, err := uc.GetHistory(context.Background(), "patient-1", 7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("len(items) = %d, want 1", len(items))
+	}
+	if items[0].HealthScore == nil {
+		t.Fatal("HealthScore = nil, want 82")
+	}
+	if *items[0].HealthScore != score {
+		t.Errorf("HealthScore = %d, want %d", *items[0].HealthScore, score)
 	}
 }
 

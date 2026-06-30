@@ -248,9 +248,10 @@ func (u *RecordUseCase) GetHistory(ctx context.Context, patientID string, limit 
 	items := make([]model.RecordHistoryItem, 0, len(rows))
 	for _, row := range rows {
 		item := model.RecordHistoryItem{
-			Date:       row.LogDate.Format("2006-01-02"),
-			BloodSugar: row.BloodSugar,
-			Weight:     row.Weight,
+			Date:        row.LogDate.Format("2006-01-02"),
+			BloodSugar:  row.BloodSugar,
+			Weight:      row.Weight,
+			HealthScore: row.HealthScore,
 		}
 		if row.BpRaw != nil {
 			var bp struct {
