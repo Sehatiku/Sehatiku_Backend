@@ -15,6 +15,7 @@ type recordUseCase interface {
 	CreateRecord(ctx context.Context, patientID string, req *model.CreateRecordRequest) (*model.CreateRecordResponse, error)
 	GetHistory(ctx context.Context, patientID string, limit int) ([]model.RecordHistoryItem, error)
 	GetTodayStatus(ctx context.Context, patientID string) (*model.TodayStatusResponse, error)
+	GetLoggedToday(ctx context.Context, patientID string) (bool, error)
 }
 
 type RecordController struct {
@@ -75,6 +76,26 @@ func (c *RecordController) GetTodayStatus(ctx *echo.Context) error {
 	return ctx.JSON(http.StatusOK, model.WebResponse[*model.TodayStatusResponse]{
 		Message: "status input harian berhasil diambil",
 		Data:    data,
+	})
+}
+
+// GetLoggedToday menangani GET /api/v1/patients/records/logged-today.
+// Mengembalikan satu boolean: true jika pasien sudah mengisi minimal satu log hari ini (WIB),
+// false jika belum. Tidak ada payload tambahan agar mobile bisa cek cepat tanpa parsing.
+func (c *RecordController) GetLoggedToday(ctx *echo.Context) error {
+	claims := getPatientClaimsFromCtx(ctx)
+
+	logged, err := c.UseCase.GetLoggedToday(ctx.Request().Context(), claims.PatientID)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
+			Message: "internal server error",
+			Errors:  err.Error(),
+		})
+	}
+
+	return ctx.JSON(http.StatusOK, model.WebResponse[bool]{
+		Message: "status input harian berhasil diambil",
+		Data:    logged,
 	})
 }
 
