@@ -4,6 +4,7 @@ import (
 	"sehatiku-backend/internal/delivery/http/controller"
 	"sehatiku-backend/internal/delivery/http/routing"
 	wadelivery "sehatiku-backend/internal/delivery/whatsapp"
+	geminigw "sehatiku-backend/internal/gateway/gemini"
 	mlgw "sehatiku-backend/internal/gateway/ml"
 	ocrgw "sehatiku-backend/internal/gateway/ocr"
 	"sehatiku-backend/internal/gateway/whatsapp"
@@ -63,6 +64,13 @@ func BootStrap(config *BootStrapConfig) {
 	mlGateway := mlgw.New(
 		config.Config.GetString("ML_API_BASE_URL"),
 		config.Config.GetString("ML_API_KEY"),
+		config.Log,
+	)
+
+	// Gemini generative API — menyusun narasi ringkasan kesehatan (endpoint summary).
+	geminiGateway := geminigw.New(
+		config.Config.GetString("GEMINI_API_KEY"),
+		config.Config.GetString("GEMINI_MODEL"), // kosong -> default gemini-2.5-flash
 		config.Log,
 	)
 
@@ -207,6 +215,15 @@ func BootStrap(config *BootStrapConfig) {
 		NotifRepo: patientNotificationRepo,
 		Log:       config.Log,
 	}
+	summaryRepo := &repository.SummaryRepository{}
+	summaryUC := &usecase.SummaryUseCase{
+		DB:          config.DB,
+		Repo:        summaryRepo,
+		PatientRepo: patientRepo,
+		Generator:   geminiGateway,
+		Redis:       config.Redis,
+		Log:         config.Log,
+	}
 
 	// Controllers
 	faskesAuthCtrl := &controller.FaskesAuthController{UseCase: faskesAuthUC}
@@ -229,6 +246,7 @@ func BootStrap(config *BootStrapConfig) {
 	consultationCtrl := &controller.ConsultationController{UseCase: consultationUC}
 	recordCtrl := &controller.RecordController{UseCase: recordUC}
 	patientNotificationCtrl := &controller.PatientNotificationController{UseCase: patientNotificationUC}
+	summaryCtrl := &controller.SummaryController{UseCase: summaryUC}
 
 	config.App.Validator = &CustomValidator{validator: config.Validate}
 
@@ -252,6 +270,7 @@ func BootStrap(config *BootStrapConfig) {
 		ConsultationController:        consultationCtrl,
 		RecordController:              recordCtrl,
 		PatientNotificationController: patientNotificationCtrl,
+		SummaryController:             summaryCtrl,
 	}
 	routeConfig.SetUp()
 }
