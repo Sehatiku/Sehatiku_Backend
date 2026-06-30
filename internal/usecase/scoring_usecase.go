@@ -44,6 +44,12 @@ type mlScorer interface {
 	PredictHealthScore(ctx context.Context, req ml.PredictRequest) (*ml.PredictResult, error)
 }
 
+// acuteEscalationEvaluator memutus apakah skor baru memicu eskalasi acute. Optional —
+// jika nil (mis. di test scoring lama), evaluasi dilewati.
+type acuteEscalationEvaluator interface {
+	EvaluateAcute(ctx context.Context, patient *entity.Patient, score *entity.RiskScore) error
+}
+
 // ScoringUseCase ties together the nightly/on-open health-score flow:
 // roll-7 (SQL) -> daily_features -> ML /predict_health_score -> risk_scores.
 type ScoringUseCase struct {
@@ -54,6 +60,7 @@ type ScoringUseCase struct {
 	BaselineRepo     clinicalBaselineRepository
 	ML               mlScorer
 	Log              *zap.Logger
+	Escalation       acuteEscalationEvaluator // optional; nil = skip acute escalation
 }
 
 // ScorePatient computes today's features, calls the ML service, and stores the result.
@@ -129,6 +136,17 @@ func (u *ScoringUseCase) ScorePatient(ctx context.Context, patientID string) (*m
 	}
 	if err := u.RiskScoreRepo.Create(u.DB, rs); err != nil {
 		return nil, err
+	}
+
+	// Acute escalation is best-effort and must never block or fail the score response —
+	// run it fire-and-forget with a background context (same pattern as consultation reply).
+	if u.Escalation != nil {
+		go func() {
+			if escErr := u.Escalation.EvaluateAcute(context.Background(), patient, rs); escErr != nil {
+				u.Log.Warn("acute escalation evaluation failed",
+					zap.String("patient_id", patientID), zap.Error(escErr))
+			}
+		}()
 	}
 
 	u.Log.Info("patient scored",

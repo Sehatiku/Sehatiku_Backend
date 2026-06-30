@@ -41,3 +41,24 @@ func (r *RiskScoreRepository) ListByPatient(db *gorm.DB, patientID string, limit
 	}
 	return rows, nil
 }
+
+// FindLatestStatus returns the status of the most recent risk score for a patient,
+// excluding excludeID (the just-created row). found=false when the patient has no other
+// score yet. Used to detect a fresh transition into 'bahaya'.
+func (r *RiskScoreRepository) FindLatestStatus(db *gorm.DB, patientID, excludeID string) (string, bool, error) {
+	var status string
+	err := db.Raw(`
+		SELECT status
+		FROM risk_scores
+		WHERE patient_id = ? AND id <> ?
+		ORDER BY scored_at DESC
+		LIMIT 1
+	`, patientID, excludeID).Scan(&status).Error
+	if err != nil {
+		return "", false, fmt.Errorf("finding latest risk status for patient %s: %w", patientID, err)
+	}
+	if status == "" {
+		return "", false, nil
+	}
+	return status, true, nil
+}

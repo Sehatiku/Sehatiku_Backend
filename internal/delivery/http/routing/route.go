@@ -31,6 +31,7 @@ type RouteConfig struct {
 	PatientNotificationController *controller.PatientNotificationController
 	SummaryController             *controller.SummaryController
 	BaselineController            *controller.BaselineController
+	EscalationController          *controller.EscalationController
 }
 
 func (r *RouteConfig) SetUp() {
@@ -79,6 +80,10 @@ func (r *RouteConfig) SetupNakesAuthedRoute() {
 	g.GET("/consultations", r.ConsultationController.GetNakesList)
 	g.POST("/consultations/:id/reply", r.ConsultationController.Reply)
 	g.GET("/patients/:id/summary", r.SummaryController.GetNakesPatientSummary)
+	g.GET("/escalations", r.EscalationController.GetQueue)
+	g.PATCH("/escalations/:id/view", r.EscalationController.View)
+	g.PATCH("/escalations/:id/act", r.EscalationController.Act)
+	g.PATCH("/escalations/:id/dismiss", r.EscalationController.Dismiss)
 }
 
 func (r *RouteConfig) SetupPatientGuestRoute() {
