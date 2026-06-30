@@ -90,7 +90,7 @@ func (r *DashboardRepository) GetPatientQueue(db *gorm.DB, faskesID string, limi
 		-- urutkan status terburuk dulu, lalu health_score TERENDAH dulu dalam tiap status.
 		-- Pasien tanpa skor (status NULL) ditaruh paling bawah.
 		ORDER BY
-			CASE COALESCE(lr.status, 'none')
+			CASE lr.status::text
 				WHEN 'bahaya' THEN 0
 				WHEN 'waswas' THEN 1
 				WHEN 'aman'   THEN 2
