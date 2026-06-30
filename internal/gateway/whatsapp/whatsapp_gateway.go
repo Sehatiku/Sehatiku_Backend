@@ -123,6 +123,48 @@ func (g *WhatsAppGateway) SendConsultationReply(ctx context.Context, toPhone, pa
 	return nil
 }
 
+// SendEscalationToNakes memberi tahu nakes bahwa seorang pasiennya butuh perhatian akut.
+// Dipanggil fire-and-forget — error hanya di-log/dicatat sebagai notifications.status=failed.
+func (g *WhatsAppGateway) SendEscalationToNakes(ctx context.Context, toPhone, nakesName, patientName, riskStatus string) error {
+	text := fmt.Sprintf(
+		"🚨 *Sehatiku — Eskalasi Pasien*\n\nHalo %s 👋\n\nPasien Anda *%s* terdeteksi berstatus *%s* dan perlu perhatian segera.\n\nMohon buka dashboard Sehatiku untuk meninjau detail dan menindaklanjuti 🩺",
+		nakesName, patientName, riskStatus,
+	)
+	if err := g.sendText(ctx, toPhone, text); err != nil {
+		return fmt.Errorf("sending wa escalation to nakes %s: %w", toPhone, err)
+	}
+	g.Log.Info("wa escalation sent to nakes", zap.String("to", toPhone))
+	return nil
+}
+
+// SendEscalationToPatient memberi tahu pasien bahwa kondisinya perlu perhatian dan tim
+// kesehatannya sudah diberi tahu. Bahasa ramah-lansia, tanpa detail klinis menakutkan.
+func (g *WhatsAppGateway) SendEscalationToPatient(ctx context.Context, toPhone, patientName string) error {
+	text := fmt.Sprintf(
+		"💙 *Sehatiku*\n\nHalo %s 👋\n\nKondisi kesehatan Anda hari ini perlu perhatian. Tim kesehatan Anda sudah kami beri tahu.\n\nMohon segera hubungi atau kunjungi faskes Anda ya 🙏",
+		patientName,
+	)
+	if err := g.sendText(ctx, toPhone, text); err != nil {
+		return fmt.Errorf("sending wa escalation to patient %s: %w", toPhone, err)
+	}
+	g.Log.Info("wa escalation sent to patient", zap.String("to", toPhone))
+	return nil
+}
+
+// SendEscalationToCompanion meminta pendamping membantu pasien (sering lansia) segera
+// menghubungi faskes.
+func (g *WhatsAppGateway) SendEscalationToCompanion(ctx context.Context, toPhone, companionName, patientName string) error {
+	text := fmt.Sprintf(
+		"🤝 *Sehatiku — Mohon Bantuan Anda*\n\nHalo %s 👋\n\nKondisi *%s* hari ini perlu perhatian. Mohon bantu beliau untuk segera menghubungi atau mengunjungi faskes 🙏\n\nTerima kasih atas kepedulian Anda 💙",
+		companionName, patientName,
+	)
+	if err := g.sendText(ctx, toPhone, text); err != nil {
+		return fmt.Errorf("sending wa escalation to companion %s: %w", toPhone, err)
+	}
+	g.Log.Info("wa escalation sent to companion", zap.String("to", toPhone))
+	return nil
+}
+
 // sendText adalah helper internal untuk mengirim pesan teks biasa ke satu nomor WA.
 func (g *WhatsAppGateway) sendText(ctx context.Context, toPhone, text string) error {
 	if g.Client == nil {

@@ -11,6 +11,7 @@ import (
 	"sehatiku-backend/internal/helper"
 	"sehatiku-backend/internal/repository"
 	"sehatiku-backend/internal/usecase"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
@@ -195,11 +196,46 @@ func BootStrap(config *BootStrapConfig) {
 		ML:               mlGateway,
 		Log:              config.Log,
 	}
+	alertBudget := config.Config.GetInt("ALERT_BUDGET")
+	if alertBudget == 0 {
+		alertBudget = 20 // default harian per nakes; 0 di env = pakai default ini
+	}
+	acuteCooldownHours := config.Config.GetInt("ACUTE_COOLDOWN_HOURS")
+	if acuteCooldownHours <= 0 {
+		acuteCooldownHours = 24
+	}
+	acuteGlucoseHigh := config.Config.GetFloat64("ACUTE_GLUCOSE_HIGH")
+	if acuteGlucoseHigh <= 0 {
+		acuteGlucoseHigh = 300
+	}
+	acuteGlucoseLow := config.Config.GetFloat64("ACUTE_GLUCOSE_LOW")
+	if acuteGlucoseLow <= 0 {
+		acuteGlucoseLow = 54
+	}
+	acuteSystolicHigh := config.Config.GetFloat64("ACUTE_SYSTOLIC_HIGH")
+	if acuteSystolicHigh <= 0 {
+		acuteSystolicHigh = 180
+	}
+	acuteDiastolicHigh := config.Config.GetFloat64("ACUTE_DIASTOLIC_HIGH")
+	if acuteDiastolicHigh <= 0 {
+		acuteDiastolicHigh = 120
+	}
 	escalationUC := &usecase.EscalationUseCase{
-		DB:       config.DB,
-		Repo:     escalationRepo,
-		RiskRepo: riskScoreRepo,
-		Log:      config.Log,
+		DB:                 config.DB,
+		Repo:               escalationRepo,
+		RiskRepo:           riskScoreRepo,
+		NakesRepo:          nakesRepo,
+		WA:                 config.WhatsApp,
+		NotifRepo:          notificationRepo,
+		InboxRepo:          patientNotificationRepo,
+		AlertBudget:        alertBudget,
+		HealthLogRepo:      healthLogRepo,
+		AcuteCooldown:      time.Duration(acuteCooldownHours) * time.Hour,
+		AcuteGlucoseHigh:   acuteGlucoseHigh,
+		AcuteGlucoseLow:    acuteGlucoseLow,
+		AcuteSystolicHigh:  acuteSystolicHigh,
+		AcuteDiastolicHigh: acuteDiastolicHigh,
+		Log:                config.Log,
 	}
 	// Acute escalation hook — scoring fires it fire-and-forget after persisting a risk score.
 	scoringUC.Escalation = escalationUC

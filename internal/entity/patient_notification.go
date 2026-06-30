@@ -26,6 +26,7 @@ type PatientNotification struct {
 const (
 	PatientNotifTypeConsultationReply = "consultation_reply"
 	PatientNotifTypeDailyReminder     = "daily_reminder"
+	PatientNotifTypeEscalation        = "escalation"
 )
 
 func (PatientNotification) TableName() string {

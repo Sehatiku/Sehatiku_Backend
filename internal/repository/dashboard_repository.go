@@ -86,7 +86,17 @@ func (r *DashboardRepository) GetPatientQueue(db *gorm.DB, faskesID string, limi
 		FROM patients p
 		LEFT JOIN latest_risk lr ON p.id = lr.patient_id
 		WHERE p.faskes_id = ? AND p.status = 'active'
-		ORDER BY COALESCE(lr.score, 0) DESC
+		-- Triase: paling berisiko di atas. score = health_score (TINGGI = sehat), jadi
+		-- urutkan status terburuk dulu, lalu health_score TERENDAH dulu dalam tiap status.
+		-- Pasien tanpa skor (status NULL) ditaruh paling bawah.
+		ORDER BY
+			CASE COALESCE(lr.status, 'none')
+				WHEN 'bahaya' THEN 0
+				WHEN 'waswas' THEN 1
+				WHEN 'aman'   THEN 2
+				ELSE 3
+			END ASC,
+			COALESCE(lr.score, 1000) ASC
 		LIMIT ? OFFSET ?
 	`, faskesID, faskesID, limit, offset).Scan(&rows).Error
 	if err != nil {

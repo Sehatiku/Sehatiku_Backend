@@ -27,3 +27,23 @@ func (r *HealthLogRepository) FindByID(db *gorm.DB, id string) (*entity.HealthLo
 	}
 	return &log, nil
 }
+
+// HasExtremeReadingToday melaporkan apakah pasien punya pembacaan ekstrem HARI INI (WIB):
+// gula >= glucoseHigh atau <= glucoseLow, atau tensi sistolik >= systolicHigh / diastolik
+// >= diastolicHigh. Dipakai sebagai pemicu eskalasi acute selain transisi status ke bahaya.
+func (r *HealthLogRepository) HasExtremeReadingToday(db *gorm.DB, patientID string, glucoseHigh, glucoseLow, systolicHigh, diastolicHigh float64) (bool, error) {
+	var count int64
+	err := db.Model(&entity.HealthLog{}).
+		Where(`patient_id = ?
+			AND (measured_at AT TIME ZONE 'Asia/Jakarta')::date = (now() AT TIME ZONE 'Asia/Jakarta')::date
+			AND (
+				(metric_type = 'glucose' AND value_numeric IS NOT NULL AND (value_numeric >= ? OR value_numeric <= ?))
+				OR (metric_type = 'bp' AND value_jsonb IS NOT NULL AND (
+					(value_jsonb->>'systolic')::numeric >= ? OR (value_jsonb->>'diastolic')::numeric >= ?))
+			)`, patientID, glucoseHigh, glucoseLow, systolicHigh, diastolicHigh).
+		Count(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("checking extreme reading for patient %s: %w", patientID, err)
+	}
+	return count > 0, nil
+}
