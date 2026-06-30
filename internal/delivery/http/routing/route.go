@@ -65,6 +65,10 @@ func (r *RouteConfig) SetupFaskesAuthedRoute() {
 	g.GET("/patients/:id/baseline", r.BaselineController.GetLatest)
 	g.POST("/patients/:id/baseline", r.BaselineController.Create)
 	g.GET("/patients/:id/baseline/history", r.BaselineController.GetHistory)
+	g.GET("/escalations", r.EscalationController.GetQueueAsFaskes)
+	g.PATCH("/escalations/:id/view", r.EscalationController.ViewAsFaskes)
+	g.PATCH("/escalations/:id/act", r.EscalationController.ActAsFaskes)
+	g.PATCH("/escalations/:id/dismiss", r.EscalationController.DismissAsFaskes)
 }
 
 func (r *RouteConfig) SetupNakesGuestRoute() {

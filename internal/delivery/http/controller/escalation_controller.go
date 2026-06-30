@@ -24,14 +24,20 @@ type EscalationController struct {
 }
 
 func (c *EscalationController) GetQueue(ctx *echo.Context) error {
-	claims := getNakesClaimsFromCtx(ctx)
+	return c.getQueue(ctx, getNakesClaimsFromCtx(ctx).FaskesID)
+}
 
+func (c *EscalationController) GetQueueAsFaskes(ctx *echo.Context) error {
+	return c.getQueue(ctx, getFaskesClaimsFromCtx(ctx).FaskesID)
+}
+
+func (c *EscalationController) getQueue(ctx *echo.Context, faskesID string) error {
 	page, _ := strconv.Atoi(ctx.QueryParam("page"))
 	size, _ := strconv.Atoi(ctx.QueryParam("size"))
 	status := ctx.QueryParam("status")
 	tier := ctx.QueryParam("tier")
 
-	items, paging, err := c.UseCase.GetQueue(ctx.Request().Context(), claims.FaskesID, status, tier, page, size)
+	items, paging, err := c.UseCase.GetQueue(ctx.Request().Context(), faskesID, status, tier, page, size)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
 			Message: "internal server error",
@@ -45,12 +51,26 @@ func (c *EscalationController) GetQueue(ctx *echo.Context) error {
 	})
 }
 
-func (c *EscalationController) View(ctx *echo.Context) error    { return c.transition(ctx, "view") }
-func (c *EscalationController) Act(ctx *echo.Context) error     { return c.transition(ctx, "act") }
-func (c *EscalationController) Dismiss(ctx *echo.Context) error { return c.transition(ctx, "dismiss") }
+func (c *EscalationController) View(ctx *echo.Context) error {
+	return c.transition(ctx, "view", getNakesClaimsFromCtx(ctx).FaskesID)
+}
+func (c *EscalationController) Act(ctx *echo.Context) error {
+	return c.transition(ctx, "act", getNakesClaimsFromCtx(ctx).FaskesID)
+}
+func (c *EscalationController) Dismiss(ctx *echo.Context) error {
+	return c.transition(ctx, "dismiss", getNakesClaimsFromCtx(ctx).FaskesID)
+}
+func (c *EscalationController) ViewAsFaskes(ctx *echo.Context) error {
+	return c.transition(ctx, "view", getFaskesClaimsFromCtx(ctx).FaskesID)
+}
+func (c *EscalationController) ActAsFaskes(ctx *echo.Context) error {
+	return c.transition(ctx, "act", getFaskesClaimsFromCtx(ctx).FaskesID)
+}
+func (c *EscalationController) DismissAsFaskes(ctx *echo.Context) error {
+	return c.transition(ctx, "dismiss", getFaskesClaimsFromCtx(ctx).FaskesID)
+}
 
-func (c *EscalationController) transition(ctx *echo.Context, action string) error {
-	claims := getNakesClaimsFromCtx(ctx)
+func (c *EscalationController) transition(ctx *echo.Context, action, faskesID string) error {
 	id := ctx.Param("id")
 	if id == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "escalation id wajib diisi"})
@@ -59,11 +79,11 @@ func (c *EscalationController) transition(ctx *echo.Context, action string) erro
 	var err error
 	switch action {
 	case "view":
-		err = c.UseCase.View(ctx.Request().Context(), id, claims.FaskesID)
+		err = c.UseCase.View(ctx.Request().Context(), id, faskesID)
 	case "act":
-		err = c.UseCase.Act(ctx.Request().Context(), id, claims.FaskesID)
+		err = c.UseCase.Act(ctx.Request().Context(), id, faskesID)
 	case "dismiss":
-		err = c.UseCase.Dismiss(ctx.Request().Context(), id, claims.FaskesID)
+		err = c.UseCase.Dismiss(ctx.Request().Context(), id, faskesID)
 	}
 	if err != nil {
 		if errors.Is(err, usecase.ErrEscalationNotFound) {
