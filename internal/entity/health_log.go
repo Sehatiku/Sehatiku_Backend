@@ -32,6 +32,19 @@ func (HealthLog) TableName() string {
 	return "health_logs"
 }
 
+// Konstanta nilai kolom health_logs — hindari magic string tersebar (be_implementation §3).
+const (
+	// LoggedBy — siapa yang mencatat pengukuran
+	LoggedByPatient   = "patient"   // pasien sendiri (app atau WA)
+	LoggedByCompanion = "companion" // pendamping/keluarga via WA
+
+	// LogSource — dari channel mana data masuk
+	LogSourceApp       = "app"       // Patient App native
+	LogSourceWhatsApp  = "whatsapp"  // WhatsApp (pasien / pendamping)
+	LogSourceSMS       = "sms"       // SMS (masa depan)
+	LogSourceWeb       = "web"       // web (legacy alias untuk app)
+)
+
 func (h *HealthLog) BeforeCreate(tx *gorm.DB) error {
 	if h.ID == "" {
 		h.ID = uuid.New().String()

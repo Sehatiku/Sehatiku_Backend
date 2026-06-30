@@ -156,7 +156,8 @@ func BootStrap(config *BootStrapConfig) {
 		NotificationRepo:  notificationRepo,
 		Log:               config.Log,
 	}
-	wadelivery.NewInboundHandler(waInboundUC, config.Log).Register(config.WhatsApp.Client)
+	inboundHandler := wadelivery.NewInboundHandler(waInboundUC, config.Log)
+	inboundHandler.Register(config.WhatsApp.Client)
 	dashboardRepo := &repository.DashboardRepository{}
 	dashboardUC := &usecase.DashboardUseCase{
 		DB:            config.DB,
@@ -176,6 +177,18 @@ func BootStrap(config *BootStrapConfig) {
 		Redis: config.Redis,
 		Log:   config.Log,
 	}
+	// Input data harian via WhatsApp: pasien/pendamping kirim teks ("gula 180",
+	// "tensi 120/80", dll) dan bot membalas konfirmasi atau panduan format.
+	// Harus setelah healthLogRepo dideklarasi; inboundHandler juga sudah siap di atas.
+	waHealthLogUC := &usecase.WAHealthLogUseCase{
+		DB:          config.DB,
+		PatientRepo: patientRepo,
+		LogRepo:     healthLogRepo,
+		Extractor:   mlGateway, // enrichment makanan via NER+TKPI (opsional)
+		WhatsApp:    config.WhatsApp,
+		Log:         config.Log,
+	}
+	inboundHandler.HealthLogUC = waHealthLogUC
 	healthLogUC := &usecase.HealthLogUseCase{
 		DB:            config.DB,
 		HealthLogRepo: healthLogRepo,

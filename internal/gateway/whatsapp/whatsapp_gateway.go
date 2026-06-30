@@ -212,3 +212,52 @@ func (g *WhatsAppGateway) sendText(ctx context.Context, toPhone, text string) er
 	}
 	return err
 }
+
+// SendHealthLogConfirmation mengirim balasan ke pasien/pendamping setelah data harian
+// berhasil disimpan. Pesan singkat, ramah-lansia, dengan emoji agar mudah dibaca.
+func (g *WhatsAppGateway) SendHealthLogConfirmation(ctx context.Context, toPhone, patientName, metricLabel, valueStr string) error {
+	text := fmt.Sprintf(
+		"✅ *Sehatiku — Data Berhasil Dicatat*\n\nHalo %s 👋\n\n%s: *%s* sudah kami simpan.\n\nTerima kasih sudah rutin mencatat ya 💙",
+		patientName, metricLabel, valueStr,
+	)
+	if err := g.sendText(ctx, toPhone, text); err != nil {
+		return fmt.Errorf("sending health log confirmation to %s: %w", toPhone, err)
+	}
+	g.Log.Info("wa health log confirmation sent", zap.String("to", toPhone))
+	return nil
+}
+
+// SendHealthLogParseError mengirim panduan format pesan yang benar ketika
+// bot tidak bisa mengenali metrik dari pesan yang dikirim pasien/pendamping.
+func (g *WhatsAppGateway) SendHealthLogParseError(ctx context.Context, toPhone string) error {
+	text := "❓ *Sehatiku*\n\nMaaf, kami belum bisa mengenali pesan Anda.\n\n" +
+		"Gunakan format berikut untuk mencatat data:\n\n" +
+		"🩸 Gula darah  : *gula 180*\n" +
+		"💊 Tekanan darah: *tensi 120/80*\n" +
+		"💊 Kepatuhan obat: *obat ya* atau *tidak minum obat*\n" +
+		"🍚 Makanan      : *makan nasi goreng*\n" +
+		"🚶 Olahraga     : *olahraga 30 menit*\n" +
+		"😴 Tidur        : *tidur 7 jam*\n" +
+		"😓 Stres        : *stres 3*\n" +
+		"⚖️ Berat badan  : *berat 65 kg*\n\n" +
+		"Balas dengan format di atas ya 🙏"
+	if err := g.sendText(ctx, toPhone, text); err != nil {
+		return fmt.Errorf("sending parse error guide to %s: %w", toPhone, err)
+	}
+	g.Log.Info("wa parse error guide sent", zap.String("to", toPhone))
+	return nil
+}
+
+// SendHealthLogNotRegistered mengirim notifikasi bahwa nomor pengirim tidak ditemukan
+// di sistem Sehatiku — kemungkinan salah nomor atau belum terdaftar.
+func (g *WhatsAppGateway) SendHealthLogNotRegistered(ctx context.Context, toPhone string) error {
+	text := "⚠️ *Sehatiku*\n\n" +
+		"Nomor ini belum terdaftar di Sehatiku.\n\n" +
+		"Jika Anda adalah pasien atau pendamping, silakan hubungi faskes Anda untuk mendaftarkan nomor ini 🏥"
+	if err := g.sendText(ctx, toPhone, text); err != nil {
+		return fmt.Errorf("sending not-registered notice to %s: %w", toPhone, err)
+	}
+	g.Log.Info("wa not-registered notice sent", zap.String("to", toPhone))
+	return nil
+}
+
