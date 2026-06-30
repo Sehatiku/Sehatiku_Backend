@@ -8,13 +8,13 @@ import (
 )
 
 type PatientClinicalBaseline struct {
-	ID                   string    `gorm:"column:id;primaryKey"`
-	PatientID            string    `gorm:"column:patient_id"`
-	RecordedAt           time.Time `gorm:"column:recorded_at"`
+	ID         string    `gorm:"column:id;primaryKey"`
+	PatientID  string    `gorm:"column:patient_id"`
+	RecordedAt time.Time `gorm:"column:recorded_at"`
 
 	// Demographics
-	AgeYears             int    `gorm:"column:age_years"`
-	Sex                  string `gorm:"column:sex"`
+	AgeYears int    `gorm:"column:age_years"`
+	Sex      string `gorm:"column:sex"`
 
 	// Anthropometry
 	BMI                  float64 `gorm:"column:bmi"`
@@ -23,8 +23,8 @@ type PatientClinicalBaseline struct {
 	CentralObesity       bool    `gorm:"column:central_obesity"`
 
 	// Lifestyle
-	SmokingStatus   string `gorm:"column:smoking_status"`
-	AlcoholUse      bool   `gorm:"column:alcohol_use"`
+	SmokingStatus    string `gorm:"column:smoking_status"`
+	AlcoholUse       bool   `gorm:"column:alcohol_use"`
 	PhysicalActivity string `gorm:"column:physical_activity"`
 
 	// Family history
@@ -32,8 +32,8 @@ type PatientClinicalBaseline struct {
 	FamilyHistoryCVD      bool `gorm:"column:family_history_cvd"`
 
 	// Blood pressure
-	SystolicBPMmhg    int    `gorm:"column:systolic_bp_mmhg"`
-	DiastolicBPMmhg   int    `gorm:"column:diastolic_bp_mmhg"`
+	SystolicBPMmhg     int    `gorm:"column:systolic_bp_mmhg"`
+	DiastolicBPMmhg    int    `gorm:"column:diastolic_bp_mmhg"`
 	HypertensionStatus string `gorm:"column:hypertension_status"`
 
 	// Glucose / diabetes
@@ -67,6 +67,10 @@ type PatientClinicalBaseline struct {
 	ClusterID        *int    `gorm:"column:cluster_id"`
 	DiagnosisCluster *string `gorm:"column:diagnosis_cluster"`
 	ClinicalGroup    *string `gorm:"column:clinical_group"`
+
+	// Audit log (nullable; baris baseline lama dari registrasi tidak memilikinya)
+	RecordedByNakesID *string `gorm:"column:recorded_by_nakes_id"`
+	Notes             *string `gorm:"column:notes"`
 
 	CreatedAt time.Time `gorm:"column:created_at"`
 }

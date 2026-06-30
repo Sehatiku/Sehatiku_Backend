@@ -30,6 +30,7 @@ type RouteConfig struct {
 	RecordController              *controller.RecordController
 	PatientNotificationController *controller.PatientNotificationController
 	SummaryController             *controller.SummaryController
+	BaselineController            *controller.BaselineController
 }
 
 func (r *RouteConfig) SetUp() {
@@ -60,6 +61,9 @@ func (r *RouteConfig) SetupFaskesAuthedRoute() {
 	g.GET("/patients/:id", r.PatientController.GetPatientDetail)
 	g.POST("/patients/register/ktp-ocr", r.PatientRegistrationController.ScanKTP)
 	g.POST("/patients/register", r.PatientRegistrationController.RegisterPatient)
+	g.GET("/patients/:id/baseline", r.BaselineController.GetLatest)
+	g.POST("/patients/:id/baseline", r.BaselineController.Create)
+	g.GET("/patients/:id/baseline/history", r.BaselineController.GetHistory)
 }
 
 func (r *RouteConfig) SetupNakesGuestRoute() {
@@ -94,6 +98,7 @@ func (r *RouteConfig) SetupPatientAuthedRoute() {
 	g.POST("/records", r.RecordController.Create)
 	g.GET("/records/history", r.RecordController.GetHistory)
 	g.GET("/records/today-status", r.RecordController.GetTodayStatus)
+	g.GET("/baseline/history", r.BaselineController.GetMyHistory)
 	g.GET("/notifications", r.PatientNotificationController.GetNotifications)
 	g.GET("/notifications/unread-count", r.PatientNotificationController.GetUnreadCount)
 	g.POST("/notifications/read-all", r.PatientNotificationController.MarkAllRead)

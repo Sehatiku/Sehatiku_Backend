@@ -30,3 +30,24 @@ func (r *PatientClinicalBaselineRepository) FindLatestByPatient(db *gorm.DB, pat
 	}
 	return &baseline, nil
 }
+
+// ListByPatient mengembalikan satu halaman baseline pasien, terbaru-dulu (recorded_at DESC),
+// beserta total seluruh baseline pasien untuk pagination. Dipakai untuk menampilkan progress
+// baseline sepanjang waktu.
+func (r *PatientClinicalBaselineRepository) ListByPatient(db *gorm.DB, patientID string, limit, offset int) ([]entity.PatientClinicalBaseline, int64, error) {
+	var total int64
+	if err := db.Model(&entity.PatientClinicalBaseline{}).
+		Where("patient_id = ?", patientID).
+		Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("counting clinical baselines by patient: %w", err)
+	}
+
+	var baselines []entity.PatientClinicalBaseline
+	if err := db.Where("patient_id = ?", patientID).
+		Order("recorded_at DESC").
+		Limit(limit).Offset(offset).
+		Find(&baselines).Error; err != nil {
+		return nil, 0, fmt.Errorf("listing clinical baselines by patient: %w", err)
+	}
+	return baselines, total, nil
+}
