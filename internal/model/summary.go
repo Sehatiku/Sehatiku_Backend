@@ -9,15 +9,20 @@ import "time"
 // Narrative kosong, dan hanya AvailableWindows yang diisi — frontend memakai itu untuk
 // menampilkan window mana saja yang valid.
 type SummaryResponse struct {
-	Window           int                `json:"window"`
-	Available        bool               `json:"available"`
-	AvailableWindows []int              `json:"available_windows"`
-	Period           *SummaryPeriod     `json:"period,omitempty"`
-	Coverage         *SummaryCoverage   `json:"coverage,omitempty"`
-	Aggregates       *SummaryAggregates `json:"aggregates,omitempty"`
-	Risk             *SummaryRisk       `json:"risk,omitempty"`
-	Narrative        string             `json:"narrative"`
-	GeneratedAt      time.Time          `json:"generated_at"`
+	Window           int   `json:"window"`
+	Available        bool  `json:"available"`
+	AvailableWindows []int `json:"available_windows"`
+	// HistoryDays = jumlah hari riwayat pencatatan pasien (log pertama s.d. hari ini, WIB).
+	// Berguna untuk frontend menampilkan progres "X dari N hari" saat data belum cukup.
+	HistoryDays int `json:"history_days"`
+	// Message = penjelasan ramah ketika Available=false (data belum cukup). Kosong saat Available=true.
+	Message     string             `json:"message,omitempty"`
+	Period      *SummaryPeriod     `json:"period,omitempty"`
+	Coverage    *SummaryCoverage   `json:"coverage,omitempty"`
+	Aggregates  *SummaryAggregates `json:"aggregates,omitempty"`
+	Risk        *SummaryRisk       `json:"risk,omitempty"`
+	Narrative   string             `json:"narrative"`
+	GeneratedAt time.Time          `json:"generated_at"`
 }
 
 type SummaryPeriod struct {
@@ -33,14 +38,14 @@ type SummaryCoverage struct {
 
 // SummaryAggregates — tiap sub-bagian nil jika tidak ada data metrik tsb di window.
 type SummaryAggregates struct {
-	Glucose       *GlucoseAggregate     `json:"glucose"`
-	BloodPressure *BPAggregate          `json:"blood_pressure"`
+	Glucose       *GlucoseAggregate      `json:"glucose"`
+	BloodPressure *BPAggregate           `json:"blood_pressure"`
 	MedAdherence  *MedAdherenceAggregate `json:"med_adherence"`
-	Nutrition     *NutritionAggregate   `json:"nutrition"`
-	Activity      *ActivityAggregate    `json:"activity"`
-	Sleep         *SleepAggregate       `json:"sleep"`
-	Stress        *StressAggregate      `json:"stress"`
-	Weight        *WeightAggregate      `json:"weight"`
+	Nutrition     *NutritionAggregate    `json:"nutrition"`
+	Activity      *ActivityAggregate     `json:"activity"`
+	Sleep         *SleepAggregate        `json:"sleep"`
+	Stress        *StressAggregate       `json:"stress"`
+	Weight        *WeightAggregate       `json:"weight"`
 }
 
 type GlucoseAggregate struct {

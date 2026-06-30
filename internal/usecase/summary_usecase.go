@@ -94,12 +94,15 @@ func (u *SummaryUseCase) buildSummary(ctx context.Context, audience, patientID s
 	if err != nil {
 		return nil, fmt.Errorf("summary earliest log date: %w", err)
 	}
-	available := computeAvailableWindows(earliest, today)
+	historyDays := historySpanDays(earliest, today)
+	available := windowsForSpan(historyDays)
 	if !containsInt(available, window) {
 		return &model.SummaryResponse{
 			Window:           window,
 			Available:        false,
 			AvailableWindows: available,
+			HistoryDays:      historyDays,
+			Message:          insufficientDataMessage(audience, window, historyDays),
 			Narrative:        "",
 			GeneratedAt:      now,
 		}, nil
@@ -137,6 +140,7 @@ func (u *SummaryUseCase) buildSummary(ctx context.Context, audience, patientID s
 		Window:           window,
 		Available:        true,
 		AvailableWindows: available,
+		HistoryDays:      historyDays,
 		Period: &model.SummaryPeriod{
 			Start: since.Format("2006-01-02"),
 			End:   today.Format("2006-01-02"),
@@ -219,21 +223,41 @@ func truncateToDay(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 }
 
-// computeAvailableWindows mengembalikan window (7/14/30) yang ditopang riwayat data:
-// sebuah window w valid jika rentang hari dari log pertama s.d. hari ini >= w.
-func computeAvailableWindows(earliest *time.Time, today time.Time) []int {
-	out := make([]int, 0, len(allowedWindows))
+// historySpanDays menghitung rentang hari riwayat pencatatan pasien: dari log pertama
+// (WIB) s.d. hari ini, inklusif. 0 jika pasien belum pernah mengisi.
+func historySpanDays(earliest *time.Time, today time.Time) int {
 	if earliest == nil {
-		return out
+		return 0
 	}
 	earliestDay := truncateToDay(earliest.In(wibLocation))
-	spanDays := int(today.Sub(earliestDay).Hours()/24) + 1 // inklusif hari pertama & hari ini
+	return int(today.Sub(earliestDay).Hours()/24) + 1
+}
+
+// windowsForSpan mengembalikan window (7/14/30) yang ditopang rentang riwayat:
+// sebuah window w valid jika spanDays >= w.
+func windowsForSpan(spanDays int) []int {
+	out := make([]int, 0, len(allowedWindows))
 	for _, w := range allowedWindows {
 		if spanDays >= w {
 			out = append(out, w)
 		}
 	}
 	return out
+}
+
+// insufficientDataMessage menyusun pesan ramah saat window yang diminta belum ditopang data.
+func insufficientDataMessage(audience string, window, historyDays int) string {
+	subject := "Data Anda"
+	if audience == summaryAudienceNakes {
+		subject = "Data pasien"
+	}
+	if historyDays <= 0 {
+		if audience == summaryAudienceNakes {
+			return fmt.Sprintf("Pasien belum memiliki data pencatatan. Ringkasan %d hari tersedia setelah ada minimal %d hari pencatatan.", window, window)
+		}
+		return fmt.Sprintf("Belum ada data kesehatan yang tercatat. Mulai catat kondisi Anda setiap hari — ringkasan %d hari tersedia setelah Anda mencatat minimal %d hari.", window, window)
+	}
+	return fmt.Sprintf("%s baru mencakup %d hari, sedangkan ringkasan %d hari membutuhkan minimal %d hari pencatatan. Terus catat kondisi harian agar ringkasan ini tersedia.", subject, historyDays, window, window)
 }
 
 func buildSummaryAggregates(raw *repository.WindowAggregatesRaw, weight *repository.WeightWindowRaw) *model.SummaryAggregates {
