@@ -29,6 +29,7 @@ type RouteConfig struct {
 	ConsultationController        *controller.ConsultationController
 	RecordController              *controller.RecordController
 	PatientNotificationController *controller.PatientNotificationController
+	SummaryController             *controller.SummaryController
 }
 
 func (r *RouteConfig) SetUp() {
@@ -73,6 +74,7 @@ func (r *RouteConfig) SetupNakesAuthedRoute() {
 	g.GET("/dashboard/patient-queue", r.DashboardController.GetPatientQueue)
 	g.GET("/consultations", r.ConsultationController.GetNakesList)
 	g.POST("/consultations/:id/reply", r.ConsultationController.Reply)
+	g.GET("/patients/:id/summary", r.SummaryController.GetNakesPatientSummary)
 }
 
 func (r *RouteConfig) SetupPatientGuestRoute() {
@@ -83,6 +85,7 @@ func (r *RouteConfig) SetupPatientGuestRoute() {
 func (r *RouteConfig) SetupPatientAuthedRoute() {
 	g := r.App.Group("/api/v1/patients", middleware.PatientAuth(r.JWTHelper))
 	g.GET("/dashboard", r.PatientDashboardController.GetDashboard)
+	g.GET("/summary", r.SummaryController.GetPatientSummary)
 	g.POST("/health-logs", r.HealthLogController.Create)
 	g.GET("/health-score", r.HealthScoreController.Get)
 	g.GET("/assigned-nakes", r.AssignedNakesController.GetAssignedNakes)

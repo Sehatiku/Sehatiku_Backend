@@ -78,6 +78,26 @@ func mapPatientError(ctx *echo.Context, err error) error {
 	}
 }
 
+func mapSummaryError(ctx *echo.Context, err error) error {
+	switch {
+	case errors.Is(err, usecase.ErrInvalidWindow):
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
+			Message: "bad request",
+			Errors:  err.Error(),
+		})
+	case errors.Is(err, usecase.ErrPatientNotFound):
+		return ctx.JSON(http.StatusNotFound, model.WebResponse[any]{
+			Message: "not found",
+			Errors:  err.Error(),
+		})
+	default:
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
+			Message: "internal server error",
+			Errors:  err.Error(),
+		})
+	}
+}
+
 func mapHealthLogError(ctx *echo.Context, err error) error {
 	switch {
 	case errors.Is(err, usecase.ErrInvalidHealthLog):
