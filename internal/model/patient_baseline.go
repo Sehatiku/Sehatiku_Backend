@@ -84,8 +84,22 @@ type BaselineDetailResponse struct {
 	ClinicalGroup    *string `json:"clinical_group"`
 }
 
+// HealthScorePoint adalah satu titik tren health score (hasil skoring ML) pada waktu tertentu.
+type HealthScorePoint struct {
+	Score    int       `json:"score"`  // 0-100
+	Status   string    `json:"status"` // aman | waswas | bahaya
+	ScoredAt time.Time `json:"scored_at"`
+}
+
+// BaselineHistoryResponse menggabungkan progress baseline (paginated) dengan tren health
+// score pasien sebagai dua deret terpisah. Dipakai endpoint baseline/history sisi faskes.
+type BaselineHistoryResponse struct {
+	BaselineHistory    []BaselineHistoryItem `json:"baseline_history"`
+	HealthScoreHistory []HealthScorePoint    `json:"health_score_history"`
+}
+
 // BaselineHistoryItem adalah satu entri pada timeline progress baseline — hanya metrik
-// kunci yang relevan untuk dipantau perubahannya. Shape sama untuk faskes & pasien.
+// kunci yang relevan untuk dipantau perubahannya.
 type BaselineHistoryItem struct {
 	ID                  string    `json:"id"`
 	RecordedAt          time.Time `json:"recorded_at"`

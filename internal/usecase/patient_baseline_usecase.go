@@ -7,6 +7,7 @@ import (
 	"math"
 	"sehatiku-backend/internal/entity"
 	"sehatiku-backend/internal/model"
+	"sehatiku-backend/internal/repository"
 	"time"
 
 	"go.uber.org/zap"
@@ -20,11 +21,12 @@ var ErrBaselineNotFound = errors.New("baseline pasien belum tersedia")
 var ErrInvalidRecordedAt = errors.New("format recorded_at tidak valid (gunakan YYYY-MM-DD)")
 
 type PatientBaselineUseCase struct {
-	DB           *gorm.DB
-	BaselineRepo baselineHistoryRepo
-	PatientRepo  baselinePatientRepo
-	NakesRepo    baselineNakesRepo
-	Log          *zap.Logger
+	DB            *gorm.DB
+	BaselineRepo  baselineHistoryRepo
+	PatientRepo   baselinePatientRepo
+	NakesRepo     baselineNakesRepo
+	RiskScoreRepo baselineRiskScoreRepo
+	Log           *zap.Logger
 }
 
 type baselineHistoryRepo interface {
@@ -40,6 +42,10 @@ type baselinePatientRepo interface {
 type baselineNakesRepo interface {
 	FindByID(db *gorm.DB, id string) (*entity.Nakes, error)
 	FindByIDs(db *gorm.DB, ids []string) ([]entity.Nakes, error)
+}
+
+type baselineRiskScoreRepo interface {
+	ListByPatient(db *gorm.DB, patientID string, limit int) ([]repository.RiskScoreHistoryRow, error)
 }
 
 // GetLatestBaseline mengembalikan baseline TERLENGKAP terbaru milik pasien (untuk pre-fill
@@ -109,13 +115,36 @@ func (u *PatientBaselineUseCase) CreateBaseline(ctx context.Context, faskesID, p
 	return u.toBaselineDetail(baseline, nakes.FullName), nil
 }
 
-// ListBaselineHistoryForFaskes mengembalikan progress baseline (metrik kunci) milik pasien
-// untuk faskes, paginated terbaru-dulu. Tenant isolation lewat faskesID.
-func (u *PatientBaselineUseCase) ListBaselineHistoryForFaskes(ctx context.Context, faskesID, patientID string, page, size int) ([]model.BaselineHistoryItem, model.PageMetadata, error) {
+// ListBaselineHistoryForFaskes mengembalikan progress baseline (metrik kunci, paginated)
+// milik pasien BESERTA tren health score (deret terpisah, dibatasi scoreLimit), terbaru-dulu.
+// Tenant isolation lewat faskesID.
+func (u *PatientBaselineUseCase) ListBaselineHistoryForFaskes(ctx context.Context, faskesID, patientID string, page, size, scoreLimit int) (*model.BaselineHistoryResponse, model.PageMetadata, error) {
 	if _, err := u.ensurePatientOwned(faskesID, patientID); err != nil {
 		return nil, model.PageMetadata{}, err
 	}
-	return u.listHistory(patientID, page, size)
+
+	items, paging, err := u.listHistory(patientID, page, size)
+	if err != nil {
+		return nil, model.PageMetadata{}, err
+	}
+
+	scores, err := u.RiskScoreRepo.ListByPatient(u.DB, patientID, scoreLimit)
+	if err != nil {
+		return nil, model.PageMetadata{}, fmt.Errorf("listing health score history: %w", err)
+	}
+	points := make([]model.HealthScorePoint, len(scores))
+	for i := range scores {
+		points[i] = model.HealthScorePoint{
+			Score:    scores[i].Score,
+			Status:   scores[i].Status,
+			ScoredAt: scores[i].ScoredAt,
+		}
+	}
+
+	return &model.BaselineHistoryResponse{
+		BaselineHistory:    items,
+		HealthScoreHistory: points,
+	}, paging, nil
 }
 
 // ListBaselineHistoryForPatient mengembalikan progress baseline pasien itu sendiri

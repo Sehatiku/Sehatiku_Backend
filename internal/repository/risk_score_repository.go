@@ -3,6 +3,7 @@ package repository
 import (
 	"fmt"
 	"sehatiku-backend/internal/entity"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -15,4 +16,28 @@ func (r *RiskScoreRepository) Create(db *gorm.DB, score *entity.RiskScore) error
 		return fmt.Errorf("creating risk score: %w", err)
 	}
 	return nil
+}
+
+// RiskScoreHistoryRow adalah satu titik tren health score (score 0-100 + status) pada waktu tertentu.
+type RiskScoreHistoryRow struct {
+	Score    int       `gorm:"column:score"`
+	Status   string    `gorm:"column:status"`
+	ScoredAt time.Time `gorm:"column:scored_at"`
+}
+
+// ListByPatient mengembalikan tren health score pasien (score, status, scored_at),
+// terbaru-dulu, dibatasi limit. Dipakai untuk menampilkan progress health score.
+func (r *RiskScoreRepository) ListByPatient(db *gorm.DB, patientID string, limit int) ([]RiskScoreHistoryRow, error) {
+	var rows []RiskScoreHistoryRow
+	err := db.Raw(`
+		SELECT score, status, scored_at
+		FROM risk_scores
+		WHERE patient_id = ?
+		ORDER BY scored_at DESC
+		LIMIT ?
+	`, patientID, limit).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("listing risk score history: %w", err)
+	}
+	return rows, nil
 }

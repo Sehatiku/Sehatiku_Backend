@@ -12,7 +12,7 @@ import (
 type baselineUseCase interface {
 	GetLatestBaseline(ctx context.Context, faskesID, patientID string) (*model.BaselineDetailResponse, error)
 	CreateBaseline(ctx context.Context, faskesID, patientID string, req *model.CreateBaselineRequest) (*model.BaselineDetailResponse, error)
-	ListBaselineHistoryForFaskes(ctx context.Context, faskesID, patientID string, page, size int) ([]model.BaselineHistoryItem, model.PageMetadata, error)
+	ListBaselineHistoryForFaskes(ctx context.Context, faskesID, patientID string, page, size, scoreLimit int) (*model.BaselineHistoryResponse, model.PageMetadata, error)
 	ListBaselineHistoryForPatient(ctx context.Context, patientID string, page, size int) ([]model.BaselineHistoryItem, model.PageMetadata, error)
 }
 
@@ -93,14 +93,15 @@ func (c *BaselineController) GetHistory(ctx *echo.Context) error {
 	}
 
 	page, size := parsePageSize(ctx)
-	items, paging, err := c.UseCase.ListBaselineHistoryForFaskes(ctx.Request().Context(), claims.FaskesID, patientID, page, size)
+	scoreLimit := parseScoreLimit(ctx)
+	resp, paging, err := c.UseCase.ListBaselineHistoryForFaskes(ctx.Request().Context(), claims.FaskesID, patientID, page, size, scoreLimit)
 	if err != nil {
 		return mapBaselineError(ctx, err)
 	}
 
-	return ctx.JSON(http.StatusOK, model.WebResponse[[]model.BaselineHistoryItem]{
+	return ctx.JSON(http.StatusOK, model.WebResponse[*model.BaselineHistoryResponse]{
 		Message: "riwayat baseline berhasil diambil",
-		Data:    items,
+		Data:    resp,
 		Paging:  &paging,
 	})
 }
@@ -133,4 +134,17 @@ func parsePageSize(ctx *echo.Context) (int, int) {
 		size = 20
 	}
 	return page, size
+}
+
+// parseScoreLimit membaca query param score_limit (jumlah titik tren health score),
+// default 90, maks 365.
+func parseScoreLimit(ctx *echo.Context) int {
+	n, _ := strconv.Atoi(ctx.QueryParam("score_limit"))
+	if n < 1 {
+		n = 90
+	}
+	if n > 365 {
+		n = 365
+	}
+	return n
 }

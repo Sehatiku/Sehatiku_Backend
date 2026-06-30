@@ -225,11 +225,12 @@ func BootStrap(config *BootStrapConfig) {
 		Log:         config.Log,
 	}
 	baselineUC := &usecase.PatientBaselineUseCase{
-		DB:           config.DB,
-		BaselineRepo: patientClinicalBaselineRepo,
-		PatientRepo:  patientRepo,
-		NakesRepo:    nakesRepo,
-		Log:          config.Log,
+		DB:            config.DB,
+		BaselineRepo:  patientClinicalBaselineRepo,
+		PatientRepo:   patientRepo,
+		NakesRepo:     nakesRepo,
+		RiskScoreRepo: riskScoreRepo,
+		Log:           config.Log,
 	}
 
 	// Controllers
