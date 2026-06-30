@@ -122,11 +122,17 @@ func BootStrap(config *BootStrapConfig) {
 		NakesRepo: nakesRepo,
 		Log:       config.Log,
 	}
+	patientDashboardRepo := &repository.PatientDashboardRepository{}
+	riskScoreRepo := &repository.RiskScoreRepository{}
+
 	patientUC := &usecase.PatientUseCase{
-		DB:          config.DB,
-		PatientRepo: patientRepo,
-		NakesRepo:   nakesRepo,
-		Log:         config.Log,
+		DB:            config.DB,
+		PatientRepo:   patientRepo,
+		NakesRepo:     nakesRepo,
+		BaselineRepo:  patientClinicalBaselineRepo,
+		HistoryRepo:   patientDashboardRepo,
+		RiskScoreRepo: riskScoreRepo,
+		Log:           config.Log,
 	}
 	patientRegUC := &usecase.PatientRegistrationUseCase{
 		DB:                config.DB,
@@ -156,7 +162,7 @@ func BootStrap(config *BootStrapConfig) {
 		DashboardRepo: dashboardRepo,
 		Log:           config.Log,
 	}
-	patientDashboardRepo := &repository.PatientDashboardRepository{}
+
 	patientDashboardUC := &usecase.PatientDashboardUseCase{
 		DB:          config.DB,
 		Repo:        patientDashboardRepo,
@@ -179,7 +185,7 @@ func BootStrap(config *BootStrapConfig) {
 
 	// Skoring harian: roll-7 (SQL) -> daily_features -> ML /predict -> risk_scores.
 	dailyFeatureRepo := &repository.DailyFeatureRepository{}
-	riskScoreRepo := &repository.RiskScoreRepository{}
+
 	scoringUC := &usecase.ScoringUseCase{
 		DB:               config.DB,
 		DailyFeatureRepo: dailyFeatureRepo,

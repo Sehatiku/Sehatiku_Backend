@@ -62,3 +62,13 @@ func (r *RiskScoreRepository) FindLatestStatus(db *gorm.DB, patientID, excludeID
 	}
 	return status, true, nil
 }
+
+// FindLatestByPatient mengembalikan risk score terbaru (lengkap dengan TopFactors).
+func (r *RiskScoreRepository) FindLatestByPatient(db *gorm.DB, patientID string) (*entity.RiskScore, error) {
+	var score entity.RiskScore
+	err := db.Where("patient_id = ?", patientID).Order("scored_at desc").First(&score).Error
+	if err != nil {
+		return nil, err
+	}
+	return &score, nil
+}

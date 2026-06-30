@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -16,10 +17,13 @@ import (
 var ErrPatientNotFound = errors.New("pasien tidak ditemukan")
 
 type PatientUseCase struct {
-	DB          *gorm.DB
-	PatientRepo patientRepository
-	NakesRepo   patientNakesLookupRepository
-	Log         *zap.Logger
+	DB            *gorm.DB
+	PatientRepo   patientRepository
+	NakesRepo     patientNakesLookupRepository
+	BaselineRepo  patientBaselineRepo
+	HistoryRepo   patientRecordHistoryRepo
+	RiskScoreRepo patientRiskScoreRepo
+	Log           *zap.Logger
 }
 
 type patientRepository interface {
@@ -29,6 +33,18 @@ type patientRepository interface {
 
 type patientNakesLookupRepository interface {
 	FindByID(db *gorm.DB, id string) (*entity.Nakes, error)
+}
+
+type patientBaselineRepo interface {
+	FindLatestByPatient(db *gorm.DB, patientID string) (*entity.PatientClinicalBaseline, error)
+}
+
+type patientRecordHistoryRepo interface {
+	GetRecordHistory(db *gorm.DB, patientID string, limit int) ([]repository.RecordHistoryRaw, error)
+}
+
+type patientRiskScoreRepo interface {
+	FindLatestByPatient(db *gorm.DB, patientID string) (*entity.RiskScore, error)
 }
 
 // ListPatients mengembalikan daftar pasien (semua status) milik faskes yang sedang
@@ -130,5 +146,116 @@ func (u *PatientUseCase) GetPatientDetail(ctx context.Context, faskesID, patient
 		EnrolledAt:        patient.EnrolledAt,
 		CreatedAt:         patient.CreatedAt,
 		UpdatedAt:         patient.UpdatedAt,
+	}, nil
+}
+
+// GetNakesPatientDetail mengembalikan detail pasien untuk dokter/nakes,
+// termasuk history baseline, log harian, dan atribut risiko.
+func (u *PatientUseCase) GetNakesPatientDetail(ctx context.Context, faskesID, nakesID, patientID string) (*model.NakesPatientDetailResponse, error) {
+	// Re-use GetPatientDetail untuk cek tenant isolation & ambil profil dasar.
+	patientDetail, err := u.GetPatientDetail(ctx, faskesID, patientID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 1. Fetch Latest Baseline
+	var baselineDetail *model.BaselineDetailResponse
+	baseline, err := u.BaselineRepo.FindLatestByPatient(u.DB, patientID)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			u.Log.Error("failed to fetch patient baseline", zap.Error(err))
+		}
+	} else {
+		var recordedByName string
+		if baseline.RecordedByNakesID != nil {
+			n, err := u.NakesRepo.FindByID(u.DB, *baseline.RecordedByNakesID)
+			if err == nil {
+				recordedByName = n.FullName
+			}
+		}
+		baselineDetail = &model.BaselineDetailResponse{
+			ID:                    baseline.ID,
+			PatientID:             baseline.PatientID,
+			RecordedAt:            baseline.RecordedAt,
+			RecordedByNakesID:     baseline.RecordedByNakesID,
+			RecordedByNakesName:   recordedByName,
+			Notes:                 baseline.Notes,
+			AgeYears:              baseline.AgeYears,
+			Sex:                   baseline.Sex,
+			BMI:                   baseline.BMI,
+			BMICategory:           baseline.BMICategory,
+			WaistCircumferenceCm:  baseline.WaistCircumferenceCm,
+			CentralObesity:        baseline.CentralObesity,
+			SmokingStatus:         baseline.SmokingStatus,
+			AlcoholUse:            baseline.AlcoholUse,
+			PhysicalActivity:      baseline.PhysicalActivity,
+			FamilyHistoryDiabetes: baseline.FamilyHistoryDiabetes,
+			FamilyHistoryCVD:      baseline.FamilyHistoryCVD,
+			SystolicBPMmhg:        baseline.SystolicBPMmhg,
+			DiastolicBPMmhg:       baseline.DiastolicBPMmhg,
+			HypertensionStatus:    baseline.HypertensionStatus,
+			FastingGlucoseMgdl:    baseline.FastingGlucoseMgdl,
+			HbA1cPct:              baseline.HbA1cPct,
+			DiabetesStatus:        baseline.DiabetesStatus,
+			TotalCholesterolMgdl:  baseline.TotalCholesterolMgdl,
+			HDLMgdl:               baseline.HDLMgdl,
+			LDLMgdl:               baseline.LDLMgdl,
+			TriglyceidesMgdl:      baseline.TriglyceidesMgdl,
+			CVDRisk10YrPct:        baseline.CVDRisk10YrPct,
+			CVDRiskCategory:       baseline.CVDRiskCategory,
+			OnAntihypertensive:    baseline.OnAntihypertensive,
+			OnAntidiabetic:        baseline.OnAntidiabetic,
+			OnStatin:              baseline.OnStatin,
+			TargetRisk:            baseline.TargetRisk,
+			EGFR:                  baseline.EGFR,
+			UACR:                  baseline.UACR,
+			ClusterID:             baseline.ClusterID,
+			DiagnosisCluster:      baseline.DiagnosisCluster,
+			ClinicalGroup:         baseline.ClinicalGroup,
+		}
+	}
+
+	// 2. Fetch Record History (Daily Logs)
+	historyRows, err := u.HistoryRepo.GetRecordHistory(u.DB, patientID, 7) // 7 days of daily logs
+	var dailyLogs []model.RecordHistoryItem
+	if err == nil {
+		for _, row := range historyRows {
+			item := model.RecordHistoryItem{
+				Date:        row.LogDate.Format("2006-01-02"),
+				BloodSugar:  row.BloodSugar,
+				Weight:      row.Weight,
+				HealthScore: row.HealthScore,
+			}
+			if row.BpRaw != nil {
+				var bp struct {
+					Systolic  int `json:"systolic"`
+					Diastolic int `json:"diastolic"`
+				}
+				if err := json.Unmarshal([]byte(*row.BpRaw), &bp); err == nil {
+					item.Systolic = &bp.Systolic
+					item.Diastolic = &bp.Diastolic
+				}
+			}
+			dailyLogs = append(dailyLogs, item)
+		}
+	}
+
+	// 3. Fetch Latest Risk Score
+	var riskFactorStatus *model.PatientRiskFactorStatus
+	riskScore, err := u.RiskScoreRepo.FindLatestByPatient(u.DB, patientID)
+	if err == nil && riskScore != nil {
+		riskFactorStatus = &model.PatientRiskFactorStatus{
+			Score:       riskScore.Score,
+			Status:      riskScore.Status,
+			ScoringMode: riskScore.ScoringMode,
+			TopFactors:  riskScore.TopFactors,
+		}
+	}
+
+	return &model.NakesPatientDetailResponse{
+		PatientDetail: *patientDetail,
+		Baseline:      baselineDetail,
+		DailyLogs:     dailyLogs,
+		Risk:          riskFactorStatus,
 	}, nil
 }

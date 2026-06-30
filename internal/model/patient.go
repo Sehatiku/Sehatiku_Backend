@@ -48,3 +48,19 @@ type PatientDetailResponse struct {
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
+
+// ── Patient Detail (nakes view) ──────────────────────────────────────────────
+
+type NakesPatientDetailResponse struct {
+	PatientDetail PatientDetailResponse    `json:"patient_detail"`
+	Baseline      *BaselineDetailResponse  `json:"baseline"`
+	DailyLogs     []RecordHistoryItem      `json:"daily_logs"`
+	Risk          *PatientRiskFactorStatus `json:"risk"`
+}
+
+type PatientRiskFactorStatus struct {
+	Score       int             `json:"score"`
+	Status      string          `json:"status"`
+	ScoringMode string          `json:"scoring_mode"`
+	TopFactors  json.RawMessage `json:"top_factors"`
+}
