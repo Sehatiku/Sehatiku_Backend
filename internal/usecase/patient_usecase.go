@@ -45,6 +45,7 @@ type patientRecordHistoryRepo interface {
 
 type patientRiskScoreRepo interface {
 	FindLatestByPatient(db *gorm.DB, patientID string) (*entity.RiskScore, error)
+	ListByPatient(db *gorm.DB, patientID string, limit int) ([]repository.RiskScoreHistoryRow, error)
 }
 
 // ListPatients mengembalikan daftar pasien (semua status) milik faskes yang sedang
@@ -252,10 +253,24 @@ func (u *PatientUseCase) GetNakesPatientDetail(ctx context.Context, faskesID, na
 		}
 	}
 
+	// 4. Fetch Health Score History
+	var healthScoreHistory []model.HealthScorePoint
+	scores, err := u.RiskScoreRepo.ListByPatient(u.DB, patientID, 7) // up to 7 latest history
+	if err == nil {
+		for _, s := range scores {
+			healthScoreHistory = append(healthScoreHistory, model.HealthScorePoint{
+				Score:    s.Score,
+				Status:   s.Status,
+				ScoredAt: s.ScoredAt,
+			})
+		}
+	}
+
 	return &model.NakesPatientDetailResponse{
-		PatientDetail: *patientDetail,
-		Baseline:      baselineDetail,
-		DailyLogs:     dailyLogs,
-		Risk:          riskFactorStatus,
+		PatientDetail:      *patientDetail,
+		Baseline:           baselineDetail,
+		DailyLogs:          dailyLogs,
+		Risk:               riskFactorStatus,
+		HealthScoreHistory: healthScoreHistory,
 	}, nil
 }

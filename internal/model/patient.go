@@ -52,10 +52,11 @@ type PatientDetailResponse struct {
 // ── Patient Detail (nakes view) ──────────────────────────────────────────────
 
 type NakesPatientDetailResponse struct {
-	PatientDetail PatientDetailResponse    `json:"patient_detail"`
-	Baseline      *BaselineDetailResponse  `json:"baseline"`
-	DailyLogs     []RecordHistoryItem      `json:"daily_logs"`
-	Risk          *PatientRiskFactorStatus `json:"risk"`
+	PatientDetail      PatientDetailResponse    `json:"patient_detail"`
+	Baseline           *BaselineDetailResponse  `json:"baseline"`
+	DailyLogs          []RecordHistoryItem      `json:"daily_logs"`
+	Risk               *PatientRiskFactorStatus `json:"risk"`
+	HealthScoreHistory []HealthScorePoint       `json:"health_score_history"`
 }
 
 type PatientRiskFactorStatus struct {
