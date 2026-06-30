@@ -20,7 +20,9 @@ type PatientDashboardProfile struct {
 }
 
 type PatientDashboardRisk struct {
-	Score      int        `json:"score"`
+	// Score null = pasien belum pernah dihitung skornya (belum ada risk_score).
+	// Frontend: jika score == null tampilkan "Skor belum tersedia", bukan angka 0.
+	Score      *int       `json:"score"`
 	RiskLabel  string     `json:"risk_label"`
 	Status     string     `json:"status"`
 	MainFactor string     `json:"main_factor"`

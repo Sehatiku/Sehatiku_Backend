@@ -138,17 +138,20 @@ func (u *PatientDashboardUseCase) GetDashboard(ctx context.Context, patientID st
 
 func buildRiskSection(row *repository.PatientRiskRow) model.PatientDashboardRisk {
 	if row == nil {
+		// Belum pernah dihitung: jangan tampilkan 0 (rancu dengan skor nyata). Score
+		// null + label/status kosong → frontend tampilkan "Skor belum tersedia".
 		return model.PatientDashboardRisk{
-			Score:      0,
-			RiskLabel:  riskLabel(0),
-			Status:     "aman",
+			Score:      nil,
+			RiskLabel:  "",
+			Status:     "",
 			MainFactor: "",
 			ScoredAt:   nil,
 		}
 	}
+	score := row.Score
 	scoredAt := row.ScoredAt
 	return model.PatientDashboardRisk{
-		Score:      row.Score,
+		Score:      &score,
 		RiskLabel:  riskLabel(row.Score),
 		Status:     row.Status,
 		MainFactor: extractMainFactor(row.TopFactors),
