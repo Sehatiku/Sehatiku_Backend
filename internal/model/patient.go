@@ -1,21 +1,28 @@
 package model
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // ── Patient List (faskes view) ───────────────────────────────────────────────
 
 type PatientListItem struct {
-	PatientID      string    `json:"patient_id"`
-	FullName       string    `json:"full_name"`
-	NIK            string    `json:"nik"`
-	Sex            string    `json:"sex"`
-	Age            int       `json:"age"`
-	DiseaseType    string    `json:"disease_type"`
-	PhoneNumber    string    `json:"phone_number"`
-	CompanionName  string    `json:"companion_name"`
-	CompanionPhone string    `json:"companion_phone"`
-	Status         string    `json:"status"`
-	EnrolledAt     time.Time `json:"enrolled_at"`
+	PatientID      string           `json:"patient_id"`
+	FullName       string           `json:"full_name"`
+	NIK            string           `json:"nik"`
+	Sex            string           `json:"sex"`
+	Age            int              `json:"age"`
+	DiseaseType    string           `json:"disease_type"`
+	PhoneNumber    string           `json:"phone_number"`
+	CompanionName  string           `json:"companion_name"`
+	CompanionPhone string           `json:"companion_phone"`
+	Status         string           `json:"status"`
+	EnrolledAt     time.Time        `json:"enrolled_at"`
+	// Risk score terbaru pasien — nil jika pasien belum pernah di-score
+	HealthScore    *int             `json:"health_score"`    // 0-100, dari risk_scores.score
+	RiskStatus     *string          `json:"risk_status"`     // aman | waswas | bahaya
+	TopFactors     json.RawMessage  `json:"top_factors"`     // [{feature, shap_value, direction}] atau null
 }
 
 // ── Patient Detail (faskes view) ─────────────────────────────────────────────
