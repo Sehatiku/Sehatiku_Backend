@@ -35,6 +35,19 @@ func (r *NakesRepository) FindByID(db *gorm.DB, id string) (*entity.Nakes, error
 	return &nakes, nil
 }
 
+// FindByIDs mengembalikan nakes untuk sekumpulan id (satu query IN), dipakai untuk
+// resolusi nama recorder secara batch (hindari N+1). ids kosong -> hasil kosong.
+func (r *NakesRepository) FindByIDs(db *gorm.DB, ids []string) ([]entity.Nakes, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var list []entity.Nakes
+	if err := db.Where("id IN ?", ids).Find(&list).Error; err != nil {
+		return nil, fmt.Errorf("finding nakes by ids: %w", err)
+	}
+	return list, nil
+}
+
 func (r *NakesRepository) FindByFaskesID(db *gorm.DB, faskesID string) ([]entity.Nakes, error) {
 	var list []entity.Nakes
 	if err := db.Where("faskes_id = ?", faskesID).Order("enrolled_at DESC").Find(&list).Error; err != nil {

@@ -224,6 +224,13 @@ func BootStrap(config *BootStrapConfig) {
 		Redis:       config.Redis,
 		Log:         config.Log,
 	}
+	baselineUC := &usecase.PatientBaselineUseCase{
+		DB:           config.DB,
+		BaselineRepo: patientClinicalBaselineRepo,
+		PatientRepo:  patientRepo,
+		NakesRepo:    nakesRepo,
+		Log:          config.Log,
+	}
 
 	// Controllers
 	faskesAuthCtrl := &controller.FaskesAuthController{UseCase: faskesAuthUC}
@@ -247,6 +254,7 @@ func BootStrap(config *BootStrapConfig) {
 	recordCtrl := &controller.RecordController{UseCase: recordUC}
 	patientNotificationCtrl := &controller.PatientNotificationController{UseCase: patientNotificationUC}
 	summaryCtrl := &controller.SummaryController{UseCase: summaryUC}
+	baselineCtrl := &controller.BaselineController{UseCase: baselineUC}
 
 	config.App.Validator = &CustomValidator{validator: config.Validate}
 
@@ -271,6 +279,7 @@ func BootStrap(config *BootStrapConfig) {
 		RecordController:              recordCtrl,
 		PatientNotificationController: patientNotificationCtrl,
 		SummaryController:             summaryCtrl,
+		BaselineController:            baselineCtrl,
 	}
 	routeConfig.SetUp()
 }
