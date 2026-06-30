@@ -109,6 +109,44 @@ func TestSummaryAvailabilityGate(t *testing.T) {
 	}
 }
 
+func TestSummaryInsufficientDataMessage(t *testing.T) {
+	// Pasien dengan riwayat hanya 4 hari, minta window 7 -> tidak tersedia, harus ada
+	// message penjelasan + history_days terisi, narasi kosong, Gemini tidak dipanggil.
+	gen := &mockSummaryGenerator{text: "x"}
+	uc := &SummaryUseCase{
+		Repo:      &mockSummaryRepo{earliest: earliestForSpan(4)},
+		Generator: gen,
+		Log:       zap.NewNop(),
+	}
+
+	resp, err := uc.GetPatientSummary(context.Background(), "patient-1", 7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Available {
+		t.Fatal("Available = true, want false")
+	}
+	if resp.HistoryDays != 4 {
+		t.Errorf("HistoryDays = %d, want 4", resp.HistoryDays)
+	}
+	if resp.Message == "" {
+		t.Error("Message kosong, harus berisi penjelasan data belum cukup")
+	}
+	if gen.calls != 0 {
+		t.Errorf("generator must not be called, calls = %d", gen.calls)
+	}
+
+	// Pasien tanpa data sama sekali -> history_days 0, tetap ada message.
+	uc.Repo = &mockSummaryRepo{earliest: nil}
+	resp, err = uc.GetPatientSummary(context.Background(), "patient-2", 7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.HistoryDays != 0 || resp.Message == "" || resp.Available {
+		t.Errorf("no-data case: got available=%v history_days=%d message=%q", resp.Available, resp.HistoryDays, resp.Message)
+	}
+}
+
 func TestSummaryInvalidWindow(t *testing.T) {
 	uc := &SummaryUseCase{
 		Repo:      &mockSummaryRepo{earliest: earliestForSpan(40)},
