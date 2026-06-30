@@ -81,8 +81,8 @@ func (r *EscalationRepository) FindByFaskes(db *gorm.DB, faskesID, status, tier 
 		SELECT
 			e.id, e.patient_id, p.full_name AS patient_name,
 			e.tier, e.status,
-			COALESCE(rs.score, 0)   AS risk_score,
-			COALESCE(rs.status, '') AS risk_status,
+			COALESCE(rs.score, 0)         AS risk_score,
+			COALESCE(rs.status::TEXT, '') AS risk_status,
 			e.sent_at, e.viewed_at, e.acted_at, e.created_at
 		FROM escalations e
 		JOIN patients p ON p.id = e.patient_id
