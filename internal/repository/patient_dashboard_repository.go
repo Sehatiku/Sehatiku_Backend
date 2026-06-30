@@ -143,13 +143,14 @@ func (r *PatientDashboardRepository) GetNakesFullName(db *gorm.DB, nakesID strin
 // RecordHistoryRaw adalah satu baris data harian agregat per hari dari health_logs,
 // dipakai oleh GetRecordHistory untuk mendukung grafik di Patient App.
 type RecordHistoryRaw struct {
-	LogDate    time.Time `gorm:"column:log_date"`
-	BloodSugar *float64  `gorm:"column:blood_sugar"`
-	BpRaw      *string   `gorm:"column:bp_raw"`
-	Weight     *float64  `gorm:"column:weight"`
+	LogDate     time.Time `gorm:"column:log_date"`
+	BloodSugar  *float64  `gorm:"column:blood_sugar"`
+	BpRaw       *string   `gorm:"column:bp_raw"`
+	Weight      *float64  `gorm:"column:weight"`
+	HealthScore *int      `gorm:"column:health_score"`
 }
 
-// GetRecordHistory mengambil riwayat harian (glucose, bp, weight) per hari terbaru.
+// GetRecordHistory mengambil riwayat harian (glucose, bp, weight, health score) per hari terbaru.
 // Untuk setiap hari, diambil satu nilai terbaru per metrik (DISTINCT ON per hari).
 // Query ini bekerja setelah migration 000008 (yang menambah 'weight' ke enum health_metric).
 func (r *PatientDashboardRepository) GetRecordHistory(db *gorm.DB, patientID string, limit int) ([]RecordHistoryRaw, error) {
@@ -180,18 +181,27 @@ func (r *PatientDashboardRepository) GetRecordHistory(db *gorm.DB, patientID str
 			FROM health_logs
 			WHERE patient_id = ? AND metric_type = 'weight' AND value_numeric IS NOT NULL
 			ORDER BY measured_at::date DESC, measured_at DESC
+		),
+		scores AS (
+			SELECT DISTINCT ON (df.feature_date) df.feature_date AS log_date, rs.score
+			FROM risk_scores rs
+			JOIN daily_features df ON df.id = rs.daily_feature_id
+			WHERE rs.patient_id = ?
+			ORDER BY df.feature_date DESC, rs.scored_at DESC
 		)
 		SELECT
 			d.log_date,
 			g.value_numeric AS blood_sugar,
 			b.bp_raw,
-			w.value_numeric AS weight
+			w.value_numeric AS weight,
+			s.score AS health_score
 		FROM days d
 		LEFT JOIN glucose g USING (log_date)
 		LEFT JOIN bp b USING (log_date)
 		LEFT JOIN wt w USING (log_date)
+		LEFT JOIN scores s USING (log_date)
 		ORDER BY d.log_date DESC
-	`, patientID, limit, patientID, patientID, patientID).Scan(&rows).Error
+	`, patientID, limit, patientID, patientID, patientID, patientID).Scan(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("getting record history: %w", err)
 	}

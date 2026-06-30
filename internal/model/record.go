@@ -35,9 +35,10 @@ type TodayStatusResponse struct {
 }
 
 type RecordHistoryItem struct {
-	Date       string   `json:"date"`
-	BloodSugar *float64 `json:"blood_sugar"`
-	Systolic   *int     `json:"systolic"`
-	Diastolic  *int     `json:"diastolic"`
-	Weight     *float64 `json:"weight"`
+	Date        string   `json:"date"`
+	BloodSugar  *float64 `json:"blood_sugar"`
+	Systolic    *int     `json:"systolic"`
+	Diastolic   *int     `json:"diastolic"`
+	Weight      *float64 `json:"weight"`
+	HealthScore *int     `json:"health_score"`
 }
