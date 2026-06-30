@@ -39,6 +39,7 @@ const (
 	NotificationStatusFailed = "failed"
 
 	MessageTypeCredentialBlast = "credential_blast"
+	MessageTypeEscalation      = "escalation"
 
 	NotificationChannelWhatsApp = "whatsapp"
 

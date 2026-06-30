@@ -17,3 +17,8 @@ type EscalationQueueItem struct {
 	ActedAt     *time.Time `json:"acted_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
+
+// SetEscalationFeedbackRequest — body PATCH /nakes/escalations/{id}/feedback.
+type SetEscalationFeedbackRequest struct {
+	Feedback string `json:"feedback" validate:"required,oneof=accurate inaccurate"`
+}

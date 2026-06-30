@@ -16,6 +16,7 @@ type escalationUseCase interface {
 	View(ctx context.Context, id, faskesID string) error
 	Act(ctx context.Context, id, faskesID string) error
 	Dismiss(ctx context.Context, id, faskesID string) error
+	SetFeedback(ctx context.Context, id, faskesID, nakesID, feedback string) error
 }
 
 type EscalationController struct {
@@ -74,4 +75,31 @@ func (c *EscalationController) transition(ctx *echo.Context, action string) erro
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
 	}
 	return ctx.JSON(http.StatusOK, model.WebResponse[any]{Message: "status eskalasi berhasil diperbarui", Data: nil})
+}
+
+func (c *EscalationController) SetFeedback(ctx *echo.Context) error {
+	claims := getNakesClaimsFromCtx(ctx)
+	id := ctx.Param("id")
+	if id == "" {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "escalation id wajib diisi"})
+	}
+
+	req := new(model.SetEscalationFeedbackRequest)
+	if err := ctx.Bind(req); err != nil {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "bad request", Errors: err.Error()})
+	}
+	if err := ctx.Validate(req); err != nil {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "validation error", Errors: err.Error()})
+	}
+
+	if err := c.UseCase.SetFeedback(ctx.Request().Context(), id, claims.FaskesID, claims.NakesID, req.Feedback); err != nil {
+		if errors.Is(err, usecase.ErrEscalationNotFound) {
+			return ctx.JSON(http.StatusNotFound, model.WebResponse[any]{Message: "eskalasi tidak ditemukan", Errors: err.Error()})
+		}
+		if errors.Is(err, usecase.ErrInvalidFeedback) {
+			return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "feedback tidak valid", Errors: err.Error()})
+		}
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
+	}
+	return ctx.JSON(http.StatusOK, model.WebResponse[any]{Message: "feedback eskalasi berhasil disimpan", Data: nil})
 }

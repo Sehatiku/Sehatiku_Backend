@@ -85,6 +85,7 @@ func (r *RouteConfig) SetupNakesAuthedRoute() {
 	g.PATCH("/escalations/:id/view", r.EscalationController.View)
 	g.PATCH("/escalations/:id/act", r.EscalationController.Act)
 	g.PATCH("/escalations/:id/dismiss", r.EscalationController.Dismiss)
+	g.PATCH("/escalations/:id/feedback", r.EscalationController.SetFeedback)
 }
 
 func (r *RouteConfig) SetupPatientGuestRoute() {

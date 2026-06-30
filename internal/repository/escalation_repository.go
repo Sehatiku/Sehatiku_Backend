@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"errors"
 	"fmt"
 	"sehatiku-backend/internal/entity"
 	"sehatiku-backend/internal/model"
@@ -20,23 +19,19 @@ func (r *EscalationRepository) Create(db *gorm.DB, e *entity.Escalation) error {
 	return nil
 }
 
-// FindActiveByPatientTier mengembalikan eskalasi yang masih terbuka (status sent/viewed)
-// untuk pasien+tier tertentu, atau (nil, nil) bila tidak ada. Dipakai untuk dedup.
-func (r *EscalationRepository) FindActiveByPatientTier(db *gorm.DB, patientID, tier string) (*entity.Escalation, error) {
-	var e entity.Escalation
-	err := db.
-		Where("patient_id = ? AND tier = ? AND status IN ?",
-			patientID, tier,
-			[]string{entity.EscalationStatusSent, entity.EscalationStatusViewed}).
-		Order("sent_at DESC").
-		First(&e).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
+// ExistsActiveOrRecent menggabungkan dedup + cooldown: true bila pasien+tier punya eskalasi
+// yang masih terbuka (status sent/viewed) ATAU baru saja dibuat (sent_at >= since). Dipakai
+// agar pasien tidak dieskalasi ulang selama alert masih terbuka atau masih dalam cooldown.
+func (r *EscalationRepository) ExistsActiveOrRecent(db *gorm.DB, patientID, tier string, since time.Time) (bool, error) {
+	var count int64
+	err := db.Model(&entity.Escalation{}).
+		Where(`patient_id = ? AND tier = ? AND (status IN ('sent','viewed') OR sent_at >= ?)`,
+			patientID, tier, since).
+		Count(&count).Error
 	if err != nil {
-		return nil, fmt.Errorf("finding active escalation for patient %s: %w", patientID, err)
+		return false, fmt.Errorf("checking active/recent escalation for patient %s: %w", patientID, err)
 	}
-	return &e, nil
+	return count > 0, nil
 }
 
 func (r *EscalationRepository) FindByID(db *gorm.DB, id string) (*entity.Escalation, error) {
@@ -105,4 +100,37 @@ func (r *EscalationRepository) FindByFaskes(db *gorm.DB, faskesID, status, tier 
 		return nil, 0, fmt.Errorf("counting escalations for faskes %s: %w", faskesID, err)
 	}
 	return items, total, nil
+}
+
+// SetFeedback menyetel label feedback nakes (accurate/inaccurate) + siapa & kapan.
+func (r *EscalationRepository) SetFeedback(db *gorm.DB, id, feedback, nakesID string, at time.Time) error {
+	updates := map[string]any{
+		"feedback":    feedback,
+		"feedback_by": nakesID,
+		"feedback_at": at,
+		"updated_at":  at,
+	}
+	res := db.Model(&entity.Escalation{}).Where("id = ?", id).Updates(updates)
+	if res.Error != nil {
+		return fmt.Errorf("setting feedback on escalation %s: %w", id, res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return fmt.Errorf("escalation %s not found: %w", id, gorm.ErrRecordNotFound)
+	}
+	return nil
+}
+
+// CountTodayByNakes menghitung eskalasi yang dikirim ke seorang nakes pada hari ini (WIB).
+// Dipakai untuk alert budget — membatasi banjir WA per nakes per hari.
+func (r *EscalationRepository) CountTodayByNakes(db *gorm.DB, nakesID string, now time.Time) (int64, error) {
+	var count int64
+	err := db.Model(&entity.Escalation{}).
+		Where(`assigned_nakes_id = ?
+			AND (sent_at AT TIME ZONE 'Asia/Jakarta')::date = (? AT TIME ZONE 'Asia/Jakarta')::date`,
+			nakesID, now).
+		Count(&count).Error
+	if err != nil {
+		return 0, fmt.Errorf("counting today's escalations for nakes %s: %w", nakesID, err)
+	}
+	return count, nil
 }
