@@ -120,3 +120,24 @@ func (r *PatientRepository) FindByFaskesIDWithRisk(db *gorm.DB, faskesID string,
 	return rows, total, nil
 }
 
+// FindByPhone mencari pasien berdasarkan phone_number yang sudah ternormalisasi
+// (format internasional, mis. "62812..."). Dipakai saat pasien mengirim pesan WA sendiri.
+// Mengembalikan gorm.ErrRecordNotFound bila tidak ada pasien dengan nomor tersebut.
+func (r *PatientRepository) FindByPhone(db *gorm.DB, phone string) (*entity.Patient, error) {
+	var patient entity.Patient
+	if err := db.Where("phone_number = ? AND status = 'active'", phone).First(&patient).Error; err != nil {
+		return nil, fmt.Errorf("finding patient by phone: %w", err)
+	}
+	return &patient, nil
+}
+
+// FindByCompanionPhone mencari pasien berdasarkan companion_phone yang sudah ternormalisasi.
+// Dipakai saat pendamping (bukan pasien sendiri) mengirim pesan WA untuk melapor.
+// Mengembalikan gorm.ErrRecordNotFound bila tidak ada pasien dengan nomor pendamping tersebut.
+func (r *PatientRepository) FindByCompanionPhone(db *gorm.DB, phone string) (*entity.Patient, error) {
+	var patient entity.Patient
+	if err := db.Where("companion_phone = ? AND status = 'active'", phone).First(&patient).Error; err != nil {
+		return nil, fmt.Errorf("finding patient by companion phone: %w", err)
+	}
+	return &patient, nil
+}
