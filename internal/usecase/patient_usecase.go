@@ -7,6 +7,7 @@ import (
 	"math"
 	"sehatiku-backend/internal/entity"
 	"sehatiku-backend/internal/model"
+	"sehatiku-backend/internal/repository"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -22,7 +23,7 @@ type PatientUseCase struct {
 }
 
 type patientRepository interface {
-	FindByFaskesID(db *gorm.DB, faskesID string, limit, offset int) ([]entity.Patient, int64, error)
+	FindByFaskesIDWithRisk(db *gorm.DB, faskesID string, limit, offset int) ([]repository.PatientWithRisk, int64, error)
 	FindByID(db *gorm.DB, id string) (*entity.Patient, error)
 }
 
@@ -31,11 +32,12 @@ type patientNakesLookupRepository interface {
 }
 
 // ListPatients mengembalikan daftar pasien (semua status) milik faskes yang sedang
-// login, dengan pagination. faskesID berasal dari JWT — tenant isolation dijaga di
-// query repository (WHERE faskes_id = ?), bukan dari input klien.
+// login, dengan pagination. Setiap item menyertakan risk score terbaru pasien
+// (health_score, risk_status, top_factors) — nil bila pasien belum pernah di-score.
+// faskesID berasal dari JWT — tenant isolation dijaga di query repository.
 func (u *PatientUseCase) ListPatients(ctx context.Context, faskesID string, page, size int) ([]model.PatientListItem, model.PageMetadata, error) {
 	offset := (page - 1) * size
-	patients, total, err := u.PatientRepo.FindByFaskesID(u.DB, faskesID, size, offset)
+	patients, total, err := u.PatientRepo.FindByFaskesIDWithRisk(u.DB, faskesID, size, offset)
 	if err != nil {
 		return nil, model.PageMetadata{}, fmt.Errorf("listing patients: %w", err)
 	}
@@ -54,6 +56,9 @@ func (u *PatientUseCase) ListPatients(ctx context.Context, faskesID string, page
 			CompanionPhone: p.CompanionPhone,
 			Status:         p.Status,
 			EnrolledAt:     p.EnrolledAt,
+			HealthScore:    p.HealthScore,
+			RiskStatus:     p.RiskStatus,
+			TopFactors:     p.TopFactors,
 		}
 	}
 
