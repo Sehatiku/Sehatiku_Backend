@@ -19,6 +19,10 @@ import (
 // payload can't be assembled.
 var ErrNoBaseline = errors.New("pasien belum memiliki baseline klinis")
 
+// healthyPenaltyMessage dipakai saat model tidak mengembalikan faktor penalti (pasien
+// sehat). Agar UI selalu punya teks dan top_penalties tidak pernah kosong.
+const healthyPenaltyMessage = "Kondisi Anda sudah baik, pertahankan pola hidup sehat Anda!"
+
 type dailyFeatureRepository interface {
 	ComputeRoll7(db *gorm.DB, patientID string, asOf time.Time) (*entity.DailyFeature, error)
 	Upsert(db *gorm.DB, df *entity.DailyFeature) error
@@ -101,6 +105,13 @@ func (u *ScoringUseCase) ScorePatient(ctx context.Context, patientID string) (*m
 	res, err := u.ML.PredictHealthScore(ctx, req)
 	if err != nil {
 		return nil, err
+	}
+
+	// Pasien sehat (model tak mengembalikan faktor): jangan biarkan top_penalties kosong
+	// — beri kalimat positif. Mengena ke response (/records, /health-score) DAN tersimpan
+	// di risk_scores.top_factors. (Layanan ML juga sudah diperbaiki untuk konsumen langsung.)
+	if len(res.TopPenalties) == 0 {
+		res.TopPenalties = []string{healthyPenaltyMessage}
 	}
 
 	// 4. persist to risk_scores.

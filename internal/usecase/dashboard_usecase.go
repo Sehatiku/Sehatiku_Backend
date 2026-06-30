@@ -63,16 +63,21 @@ func (u *DashboardUseCase) GetPatientQueue(ctx context.Context, faskesID string,
 
 	items := make([]model.PatientQueueItem, len(rows))
 	for i, row := range rows {
-		items[i] = model.PatientQueueItem{
+		item := model.PatientQueueItem{
 			PatientID:   row.ID,
 			FullName:    row.FullName,
 			Age:         calcAge(row.DateOfBirth),
 			DiseaseType: row.DiseaseType,
 			RiskScore:   row.Score,
-			RiskLabel:   riskLabel(row.Score),
-			Status:      row.RiskStatus,
 			MainFactor:  extractMainFactor(row.TopFactors),
 		}
+		// health_score di-clip ke 1-100, jadi score 0 = BELUM dinilai → kosongkan
+		// label/status agar tidak rancu (mis. jangan tampil "kritis" untuk yang belum ada skor).
+		if row.Score >= 1 {
+			item.RiskLabel = riskLabel(row.Score)
+			item.Status = row.RiskStatus
+		}
+		items[i] = item
 	}
 
 	totalPage := int64(math.Ceil(float64(total) / float64(size)))
@@ -97,11 +102,15 @@ func calcAge(dob *time.Time) int {
 	return age
 }
 
+// riskLabel menerjemahkan health_score (TINGGI = sehat) menjadi label RISIKO
+// (tinggi = bahaya). Karena score adalah health_score, risiko berbanding TERBALIK:
+// skor rendah = risiko kritis. Selaras dengan status enum (<=40 bahaya, 41-70 waswas,
+// >70 aman) supaya tidak kontradiktif (mis. skor 90 = aman = risiko rendah).
 func riskLabel(score int) string {
 	switch {
-	case score >= 80:
+	case score <= 40:
 		return "kritis"
-	case score >= 50:
+	case score <= 70:
 		return "sedang"
 	default:
 		return "rendah"
