@@ -32,6 +32,7 @@ type RouteConfig struct {
 	SummaryController             *controller.SummaryController
 	BaselineController            *controller.BaselineController
 	EscalationController          *controller.EscalationController
+	DevicePushTokenController     *controller.DevicePushTokenController
 }
 
 func (r *RouteConfig) SetUp() {
@@ -115,6 +116,8 @@ func (r *RouteConfig) SetupPatientAuthedRoute() {
 	g.GET("/notifications/unread-count", r.PatientNotificationController.GetUnreadCount)
 	g.POST("/notifications/read-all", r.PatientNotificationController.MarkAllRead)
 	g.PATCH("/notifications/:id/read", r.PatientNotificationController.MarkRead)
+	g.POST("/device-tokens", r.DevicePushTokenController.Register)
+	g.DELETE("/device-tokens", r.DevicePushTokenController.Deregister)
 }
 
 func (r *RouteConfig) SetupTokenRoute() {

@@ -7,6 +7,7 @@ import (
 	geminigw "sehatiku-backend/internal/gateway/gemini"
 	mlgw "sehatiku-backend/internal/gateway/ml"
 	ocrgw "sehatiku-backend/internal/gateway/ocr"
+	"sehatiku-backend/internal/gateway/push"
 	"sehatiku-backend/internal/gateway/whatsapp"
 	"sehatiku-backend/internal/helper"
 	"sehatiku-backend/internal/repository"
@@ -30,6 +31,7 @@ type BootStrapConfig struct {
 	Redis    *redis.Client
 	JWT      *helper.JWTHelper
 	WhatsApp *whatsapp.WhatsAppGateway
+	Push     *push.PushGateway
 }
 
 func BootStrap(config *BootStrapConfig) {
@@ -49,6 +51,7 @@ func BootStrap(config *BootStrapConfig) {
 	}
 	patientClinicalBaselineRepo := &repository.PatientClinicalBaselineRepository{}
 	escalationRepo := &repository.EscalationRepository{}
+	devicePushTokenRepo := &repository.DevicePushTokenRepository{}
 
 	// Gateways
 	ktpOCRBaseURL := config.Config.GetString("KTP_OCR_BASE_URL")
@@ -252,6 +255,18 @@ func BootStrap(config *BootStrapConfig) {
 	}
 	// Acute escalation hook — scoring fires it fire-and-forget after persisting a risk score.
 	scoringUC.Escalation = escalationUC
+	pushUC := &usecase.PushUseCase{
+		DB:        config.DB,
+		TokenRepo: devicePushTokenRepo,
+		Gateway:   config.Push,
+		Log:       config.Log,
+	}
+	escalationUC.Push = pushUC
+	devicePushTokenUC := &usecase.DevicePushTokenUseCase{
+		DB:   config.DB,
+		Repo: devicePushTokenRepo,
+		Log:  config.Log,
+	}
 	assignedNakesUC := &usecase.AssignedNakesUseCase{
 		DB:          config.DB,
 		PatientRepo: patientRepo,
@@ -264,6 +279,7 @@ func BootStrap(config *BootStrapConfig) {
 		PatientRepo: patientRepo,
 		NakesRepo:   nakesRepo,
 		InboxRepo:   patientNotificationRepo,
+		Push:        pushUC,
 		Log:         config.Log,
 	}
 	recordUC := &usecase.RecordUseCase{
@@ -321,6 +337,7 @@ func BootStrap(config *BootStrapConfig) {
 	summaryCtrl := &controller.SummaryController{UseCase: summaryUC}
 	baselineCtrl := &controller.BaselineController{UseCase: baselineUC}
 	escalationCtrl := &controller.EscalationController{UseCase: escalationUC}
+	devicePushTokenCtrl := &controller.DevicePushTokenController{UseCase: devicePushTokenUC}
 
 	config.App.Validator = &CustomValidator{validator: config.Validate}
 
@@ -347,6 +364,7 @@ func BootStrap(config *BootStrapConfig) {
 		SummaryController:             summaryCtrl,
 		BaselineController:            baselineCtrl,
 		EscalationController:          escalationCtrl,
+		DevicePushTokenController:     devicePushTokenCtrl,
 	}
 	routeConfig.SetUp()
 }

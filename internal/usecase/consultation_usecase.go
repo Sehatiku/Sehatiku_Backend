@@ -34,12 +34,19 @@ type consultationInboxRepo interface {
 	Create(db *gorm.DB, n *entity.PatientNotification) error
 }
 
+// consultationPushNotifier mengirim push notification native ke pasien saat dokter membalas.
+// Optional — nil = skip.
+type consultationPushNotifier interface {
+	Notify(ctx context.Context, patientID, title, body string, data map[string]string)
+}
+
 type ConsultationUseCase struct {
 	DB          *gorm.DB
 	Repo        consultationRepo
 	PatientRepo consultationPatientRepo
 	NakesRepo   consultationNakesRepo
 	InboxRepo   consultationInboxRepo
+	Push        consultationPushNotifier
 	Log         *zap.Logger
 }
 
@@ -129,6 +136,13 @@ func (u *ConsultationUseCase) ReplyConsultation(ctx context.Context, consultatio
 			zap.String("patient_id", c.PatientID),
 			zap.Error(dbErr),
 		)
+	}
+
+	// Push notification best-effort, fire-and-forget — never block the reply response
+	// (same pattern as ScoringUseCase's acute escalation fan-out in scoring_usecase.go).
+	if u.Push != nil {
+		go u.Push.Notify(context.Background(), c.PatientID, "Balasan dari dokter", req.NakesNote,
+			map[string]string{"type": "consultation_reply", "consultation_id": consultationID})
 	}
 
 	return nil
