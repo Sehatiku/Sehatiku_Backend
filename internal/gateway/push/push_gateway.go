@@ -22,7 +22,7 @@ type PushGateway struct {
 // pengiriman keseluruhan (mis. gateway belum dikonfigurasi, FCM down).
 func (g *PushGateway) SendMulticast(ctx context.Context, tokens []string, title, body string, data map[string]string) ([]string, error) {
 	if g.Client == nil {
-		return nil, fmt.Errorf("push gateway not initialised (FIREBASE_CREDENTIALS_FILE kosong/gagal)")
+		return nil, fmt.Errorf("push gateway not initialised (FIREBASE_CREDENTIALS_JSON/FIREBASE_CREDENTIALS_FILE kosong/gagal)")
 	}
 	if len(tokens) == 0 {
 		return nil, nil
