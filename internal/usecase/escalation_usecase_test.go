@@ -138,6 +138,20 @@ func (m *mockEscNakesRepo) FindByID(_ *gorm.DB, _ string) (*entity.Nakes, error)
 	return m.nakes, m.err
 }
 
+type mockPushNotifier struct {
+	calls []struct {
+		patientID, title, body string
+		data                   map[string]string
+	}
+}
+
+func (m *mockPushNotifier) Notify(_ context.Context, patientID, title, body string, data map[string]string) {
+	m.calls = append(m.calls, struct {
+		patientID, title, body string
+		data                   map[string]string
+	}{patientID, title, body, data})
+}
+
 func newEscalationUCFull(repo *mockEscalationRepo, risk *mockRiskReader, wa *mockNotifier, nr *mockNotifRepo, inbox *mockInboxRepo, nakes *mockEscNakesRepo, budget int) *usecase.EscalationUseCase {
 	return &usecase.EscalationUseCase{
 		DB:          nil,
@@ -279,7 +293,9 @@ func TestEvaluateAcute_FansOutToAllChannels(t *testing.T) {
 	nr := &mockNotifRepo{}
 	inbox := &mockInboxRepo{}
 	nakes := &mockEscNakesRepo{nakes: &entity.Nakes{ID: "n1", FullName: "dr. Sehat", PhoneNumber: "628999"}}
+	push := &mockPushNotifier{}
 	uc := newEscalationUCFull(repo, risk, wa, nr, inbox, nakes, 0)
+	uc.Push = push
 
 	if err := uc.EvaluateAcute(context.Background(), patientWithContacts(), bahayaScore()); err != nil {
 		t.Fatalf("EvaluateAcute error: %v", err)
@@ -296,6 +312,15 @@ func TestEvaluateAcute_FansOutToAllChannels(t *testing.T) {
 	}
 	if nr.created != 3 {
 		t.Errorf("expected 3 notification audit rows, got %d", nr.created)
+	}
+	if len(push.calls) != 1 {
+		t.Fatalf("expected push notify called once for acute escalation, got %d", len(push.calls))
+	}
+	if push.calls[0].patientID != "p1" {
+		t.Fatalf("expected push notify for patient p1, got %s", push.calls[0].patientID)
+	}
+	if push.calls[0].data["type"] != "escalation" {
+		t.Fatalf("expected data type=escalation, got %v", push.calls[0].data)
 	}
 }
 

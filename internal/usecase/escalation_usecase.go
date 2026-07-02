@@ -44,6 +44,12 @@ type escalationNotifier interface {
 	SendEscalationToCompanion(ctx context.Context, toPhone, companionName, patientName string) error
 }
 
+// escalationPushNotifier mengirim push notification native ke pasien. Optional — nil = skip
+// (server tetap jalan tanpa fitur push, sama falsafah dengan WA/InboxRepo).
+type escalationPushNotifier interface {
+	Notify(ctx context.Context, patientID, title, body string, data map[string]string)
+}
+
 type escalationNotifRepo interface {
 	Create(db *gorm.DB, n *entity.Notification) error
 	MarkStatus(db *gorm.DB, id, status string, errReason *string) error
@@ -68,6 +74,7 @@ type EscalationUseCase struct {
 	WA          escalationNotifier
 	NotifRepo   escalationNotifRepo
 	InboxRepo   escalationInboxRepo
+	Push        escalationPushNotifier
 	AlertBudget int // 0 = unlimited
 
 	// Acute trigger tuning (Increment final). HealthLogRepo optional (nil = no extreme check).
@@ -161,6 +168,14 @@ func (u *EscalationUseCase) fanOutAcute(ctx context.Context, esc *entity.Escalat
 			u.Log.Warn("escalation inbox create failed",
 				zap.String("patient_id", patient.ID), zap.Error(err))
 		}
+	}
+
+	// 1b. Push notification native — sama teks dengan inbox, di luar alert budget WA.
+	if u.Push != nil {
+		u.Push.Notify(ctx, patient.ID,
+			"Kondisi Anda perlu perhatian",
+			"Tim kesehatan Anda telah diberi tahu. Mohon segera hubungi faskes Anda.",
+			map[string]string{"type": "escalation", "escalation_id": esc.ID})
 	}
 
 	// 2. WA blast — butuh gateway + audit repo, dan tidak melewati alert budget.
