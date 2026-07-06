@@ -102,6 +102,30 @@ func (r *EscalationRepository) FindByFaskes(db *gorm.DB, faskesID, status, tier 
 	return items, total, nil
 }
 
+// EscalationBriefRow adalah ringkasan satu eskalasi untuk Pre-Visit Brief (read-only).
+type EscalationBriefRow struct {
+	Tier     string     `gorm:"column:tier"`
+	Status   string     `gorm:"column:status"`
+	Feedback *string    `gorm:"column:feedback"`
+	SentAt   time.Time  `gorm:"column:sent_at"`
+	ActedAt  *time.Time `gorm:"column:acted_at"`
+}
+
+// FindByPatientSince mengembalikan eskalasi seorang pasien sejak since, terbaru dulu.
+func (r *EscalationRepository) FindByPatientSince(db *gorm.DB, patientID string, since time.Time) ([]EscalationBriefRow, error) {
+	var rows []EscalationBriefRow
+	err := db.Raw(`
+		SELECT tier, status, feedback, sent_at, acted_at
+		FROM escalations
+		WHERE patient_id = ? AND sent_at >= ?
+		ORDER BY sent_at DESC
+	`, patientID, since).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("listing escalations for patient %s since %s: %w", patientID, since.Format("2006-01-02"), err)
+	}
+	return rows, nil
+}
+
 // SetFeedback menyetel label feedback nakes (accurate/inaccurate) + siapa & kapan.
 func (r *EscalationRepository) SetFeedback(db *gorm.DB, id, feedback, nakesID string, at time.Time) error {
 	updates := map[string]any{

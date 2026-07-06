@@ -260,7 +260,13 @@ func (u *RecordUseCase) GetHistory(ctx context.Context, patientID string, limit 
 	if err != nil {
 		return nil, fmt.Errorf("getting record history for patient %s: %w", patientID, err)
 	}
+	return mapRecordHistoryRows(rows), nil
+}
 
+// mapRecordHistoryRows memetakan baris repo ke DTO grafik harian, termasuk membongkar
+// BP jsonb {"systolic","diastolic"}. Dipakai record history, detail pasien nakes, dan
+// Pre-Visit Brief.
+func mapRecordHistoryRows(rows []repository.RecordHistoryRaw) []model.RecordHistoryItem {
 	items := make([]model.RecordHistoryItem, 0, len(rows))
 	for _, row := range rows {
 		item := model.RecordHistoryItem{
@@ -281,5 +287,5 @@ func (u *RecordUseCase) GetHistory(ctx context.Context, patientID string, limit 
 		}
 		items = append(items, item)
 	}
-	return items, nil
+	return items
 }

@@ -57,6 +57,13 @@ type SummaryUseCase struct {
 	Generator   summaryGenerator
 	Redis       *redis.Client // boleh nil → cache dinonaktifkan
 	Log         *zap.Logger
+
+	// Dependensi tambahan khusus Pre-Visit Brief (GET /nakes/patients/:id/brief) —
+	// lihat brief_usecase.go. Boleh nil bila hanya endpoint summary yang dipakai.
+	MedRepo        briefMedRepo
+	HistoryRepo    briefHistoryRepo
+	RiskRepo       briefRiskRepo
+	EscalationRepo briefEscalationRepo
 }
 
 // GetPatientSummary menyusun ringkasan untuk pasien yang sedang login (data sendiri).
@@ -175,37 +182,11 @@ func (u *SummaryUseCase) buildSummary(ctx context.Context, audience, patientID s
 
 // readCache mengembalikan response dari Redis bila ada; nil bila miss/error/disabled.
 func (u *SummaryUseCase) readCache(ctx context.Context, key string) *model.SummaryResponse {
-	if u.Redis == nil {
-		return nil
-	}
-	val, err := u.Redis.Get(ctx, key).Result()
-	if err == redis.Nil {
-		return nil
-	}
-	if err != nil {
-		u.Log.Warn("summary cache read failed", zap.String("key", key), zap.Error(err))
-		return nil
-	}
-	var resp model.SummaryResponse
-	if err := json.Unmarshal([]byte(val), &resp); err != nil {
-		u.Log.Warn("summary cache unmarshal failed", zap.String("key", key), zap.Error(err))
-		return nil
-	}
-	return &resp
+	return cacheRead[model.SummaryResponse](ctx, u.Redis, u.Log, key)
 }
 
 func (u *SummaryUseCase) writeCache(ctx context.Context, key string, resp *model.SummaryResponse) {
-	if u.Redis == nil {
-		return
-	}
-	payload, err := json.Marshal(resp)
-	if err != nil {
-		u.Log.Warn("summary cache marshal failed", zap.String("key", key), zap.Error(err))
-		return
-	}
-	if err := u.Redis.Set(ctx, key, payload, summaryCacheTTL).Err(); err != nil {
-		u.Log.Warn("summary cache write failed", zap.String("key", key), zap.Error(err))
-	}
+	cacheWrite(ctx, u.Redis, u.Log, key, resp, summaryCacheTTL)
 }
 
 func isAllowedWindow(w int) bool { return containsInt(allowedWindows, w) }

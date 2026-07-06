@@ -303,6 +303,11 @@ func BootStrap(config *BootStrapConfig) {
 		Generator:   geminiGateway,
 		Redis:       config.Redis,
 		Log:         config.Log,
+		// Dependensi tambahan Pre-Visit Brief (GET /nakes/patients/:id/brief).
+		MedRepo:        summaryRepo,
+		HistoryRepo:    patientDashboardRepo,
+		RiskRepo:       riskScoreRepo,
+		EscalationRepo: escalationRepo,
 	}
 	baselineUC := &usecase.PatientBaselineUseCase{
 		DB:            config.DB,

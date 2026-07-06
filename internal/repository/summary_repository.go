@@ -152,6 +152,34 @@ func (r *SummaryRepository) GetLogDatesSince(db *gorm.DB, patientID string, sinc
 	return dates, nil
 }
 
+// MedDayRaw adalah status kepatuhan obat satu hari (WIB): taken = ada log
+// med_adherence bernilai > 0 pada hari itu (100 = minum, 0 = tidak — konvensi
+// penulisan di record_usecase.go).
+type MedDayRaw struct {
+	LogDate time.Time `gorm:"column:log_date"`
+	Taken   bool      `gorm:"column:taken"`
+}
+
+// GetMedAdherenceDays mengembalikan status kepatuhan obat per hari (WIB) sejak since,
+// terurut naik. Hari tanpa log med_adherence tidak muncul (tidak diketahui ≠ lupa).
+func (r *SummaryRepository) GetMedAdherenceDays(db *gorm.DB, patientID string, since time.Time) ([]MedDayRaw, error) {
+	var rows []MedDayRaw
+	err := db.Raw(`
+		SELECT
+			(measured_at AT TIME ZONE 'Asia/Jakarta')::date AS log_date,
+			max(value_numeric) > 0 AS taken
+		FROM health_logs
+		WHERE patient_id = ? AND metric_type = 'med_adherence' AND value_numeric IS NOT NULL
+		  AND measured_at >= ?
+		GROUP BY 1
+		ORDER BY 1 ASC
+	`, patientID, since).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("getting med adherence days: %w", err)
+	}
+	return rows, nil
+}
+
 // SummaryRiskRow adalah risk_score terbaru pasien (konteks opsional narasi).
 type SummaryRiskRow struct {
 	Score    int       `gorm:"column:score"`
