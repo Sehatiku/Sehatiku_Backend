@@ -12,6 +12,7 @@ import (
 type patientSummaryUseCase interface {
 	GetPatientSummary(ctx context.Context, patientID string, window int) (*model.SummaryResponse, error)
 	GetNakesPatientSummary(ctx context.Context, faskesID, patientID string, window int) (*model.SummaryResponse, error)
+	GetNakesPatientBrief(ctx context.Context, faskesID, patientID string) (*model.PreVisitBriefResponse, error)
 }
 
 type SummaryController struct {
@@ -53,6 +54,29 @@ func (c *SummaryController) GetNakesPatientSummary(ctx *echo.Context) error {
 
 	return ctx.JSON(http.StatusOK, model.WebResponse[*model.SummaryResponse]{
 		Message: "ringkasan kesehatan pasien berhasil diambil",
+		Data:    data,
+	})
+}
+
+// GetNakesPatientBrief — Pre-Visit Prolanis Brief: dossier 30 hari satu pasien untuk
+// dokter menjelang kontrol bulanan (tenancy via JWT, tanpa query param).
+func (c *SummaryController) GetNakesPatientBrief(ctx *echo.Context) error {
+	claims := getNakesClaimsFromCtx(ctx)
+	patientID := ctx.Param("id")
+	if patientID == "" {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
+			Message: "bad request",
+			Errors:  "patient id wajib diisi",
+		})
+	}
+
+	data, err := c.UseCase.GetNakesPatientBrief(ctx.Request().Context(), claims.FaskesID, patientID)
+	if err != nil {
+		return mapSummaryError(ctx, err)
+	}
+
+	return ctx.JSON(http.StatusOK, model.WebResponse[*model.PreVisitBriefResponse]{
+		Message: "pre-visit brief pasien berhasil diambil",
 		Data:    data,
 	})
 }

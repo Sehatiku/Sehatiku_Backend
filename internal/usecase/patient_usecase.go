@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -220,25 +219,7 @@ func (u *PatientUseCase) GetNakesPatientDetail(ctx context.Context, faskesID, na
 	historyRows, err := u.HistoryRepo.GetRecordHistory(u.DB, patientID, 7) // 7 days of daily logs
 	var dailyLogs []model.RecordHistoryItem
 	if err == nil {
-		for _, row := range historyRows {
-			item := model.RecordHistoryItem{
-				Date:        row.LogDate.Format("2006-01-02"),
-				BloodSugar:  row.BloodSugar,
-				Weight:      row.Weight,
-				HealthScore: row.HealthScore,
-			}
-			if row.BpRaw != nil {
-				var bp struct {
-					Systolic  int `json:"systolic"`
-					Diastolic int `json:"diastolic"`
-				}
-				if err := json.Unmarshal([]byte(*row.BpRaw), &bp); err == nil {
-					item.Systolic = &bp.Systolic
-					item.Diastolic = &bp.Diastolic
-				}
-			}
-			dailyLogs = append(dailyLogs, item)
-		}
+		dailyLogs = mapRecordHistoryRows(historyRows)
 	}
 
 	// 3. Fetch Latest Risk Score
