@@ -254,3 +254,120 @@ func parseFood(s string) (ParsedMetric, bool) {
 	}
 	return ParsedMetric{}, false
 }
+
+// ─── template log harian (form multi-metrik) ──────────────────────────────────
+
+// logTemplateTriggers adalah frasa yang menandakan pengirim ingin TEMPLATE pengisian
+// log harian (mis. "saya ingin tulis log harian"), bukan sedang mencatat sebuah metrik.
+// Dicocokkan sebagai substring pada teks lowercase — sengaja spesifik agar tidak
+// bentrok dengan pesan pencatatan biasa (mis. "menu makan siang" bukan trigger).
+var logTemplateTriggers = []string{
+	"tulis log", "isi log", "log harian", "catat harian", "lapor harian",
+	"mau lapor", "ingin lapor", "mulai lapor", "template", "format log", "cara lapor",
+}
+
+// IsLogTemplateRequest mengembalikan true bila pesan meminta template log harian.
+// Caller membalas dengan form kosong untuk diisi, bukan mem-parsing metrik.
+func IsLogTemplateRequest(text string) bool {
+	s := strings.ToLower(strings.TrimSpace(text))
+	for _, kw := range logTemplateTriggers {
+		if strings.Contains(s, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// formLabelMetric memetakan label kolom template (bagian kiri titik dua) ke metric_type.
+// HasPrefix dipakai agar "gula darah" tetap kena label "gula". Entri lebih spesifik
+// didahulukan supaya tidak keburu kena label pendek yang jadi prefix-nya.
+var formLabelMetric = []struct{ label, metric string }{
+	{"tekanan darah", "bp"}, {"gula darah", "glucose"}, {"berat badan", "weight"},
+	{"tensi", "bp"}, {"td", "bp"},
+	{"gula", "glucose"}, {"gds", "glucose"}, {"gdp", "glucose"},
+	{"obat", "med_adherence"},
+	{"olahraga", "activity"}, {"aktivitas", "activity"}, {"jalan", "activity"},
+	{"tidur", "sleep"},
+	{"stres", "stress"}, {"stress", "stress"},
+	{"berat", "weight"}, {"bb", "weight"}, {"timbang", "weight"},
+	{"rokok", "smoking"}, {"alkohol", "alcohol"},
+	{"makanan", "food"}, {"makan", "food"},
+}
+
+func formMetricFor(label string) string {
+	for _, e := range formLabelMetric {
+		if strings.HasPrefix(label, e.label) {
+			return e.metric
+		}
+	}
+	return ""
+}
+
+// ParseLogForm mem-parsing pesan template multi-baris "Label: nilai" menjadi beberapa
+// metrik. Baris kosong, baris placeholder (mengandung "_"), baris tanpa titik dua/
+// sama-dengan, dan label tak dikenal dilewati diam-diam — sehingga template yang
+// diisi sebagian tetap tercatat baris terisinya saja. Mengembalikan daftar metrik
+// valid; kosong bila tak ada satu pun baris form terisi (caller fallback ke parser
+// teks-bebas satu-metrik).
+func ParseLogForm(text string) []ParsedMetric {
+	var out []ParsedMetric
+	for raw := range strings.SplitSeq(text, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.Contains(line, "_") {
+			continue
+		}
+		idx := strings.IndexAny(line, ":=")
+		if idx < 0 {
+			continue
+		}
+		label := strings.TrimSpace(strings.ToLower(line[:idx]))
+		value := strings.TrimSpace(line[idx+1:])
+		if label == "" || value == "" {
+			continue
+		}
+		metric := formMetricFor(label)
+		if metric == "" {
+			continue
+		}
+		if m, ok := parseFormValue(metric, value); ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// parseFormValue mengubah satu nilai kolom template menjadi ParsedMetric sesuai metric.
+// Berbeda dari parser teks-bebas: label sudah menentukan metric, jadi kita hanya
+// mengekstrak nilai — menghindari ambiguitas (mis. "obat: tidak" harus 0, bukan 100).
+func parseFormValue(metric, value string) (ParsedMetric, bool) {
+	v := strings.ToLower(value)
+	switch metric {
+	case "bp":
+		m := bpRE.FindStringSubmatch(v)
+		if m == nil {
+			return ParsedMetric{}, false
+		}
+		sys, _ := strconv.Atoi(m[1])
+		dia, _ := strconv.Atoi(m[2])
+		if sys < 40 || sys > 300 || dia < 20 || dia > 200 || sys <= dia {
+			return ParsedMetric{}, false
+		}
+		return ParsedMetric{MetricType: "bp", BPSystolic: ptr(sys), BPDiastolic: ptr(dia)}, true
+	case "med_adherence":
+		neg := v == "ga" || v == "gak" || v == "no" || v == "0" ||
+			strings.Contains(v, "tidak") || strings.Contains(v, "tdk") ||
+			strings.Contains(v, "belum") || strings.Contains(v, "lupa") || strings.Contains(v, "nggak")
+		if neg {
+			return ParsedMetric{MetricType: "med_adherence", ValueNumeric: ptr(0.0)}, true
+		}
+		return ParsedMetric{MetricType: "med_adherence", ValueNumeric: ptr(100.0)}, true
+	case "food":
+		return ParsedMetric{MetricType: "food", ValueText: ptr(v)}, true
+	default: // metrik numerik: glucose, weight, sleep, activity, stress, smoking, alcohol
+		n, ok := extractNumber(v)
+		if !ok {
+			return ParsedMetric{}, false
+		}
+		return ParsedMetric{MetricType: metric, ValueNumeric: ptr(n)}, true
+	}
+}
