@@ -254,10 +254,11 @@ func (g *WhatsAppGateway) SendLogTemplate(ctx context.Context, toPhone, patientN
 	if alreadyLoggedToday {
 		note = "ℹ️ Anda sudah mencatat log hari ini. Kirim lagi hanya kalau mau *menambah* atau *mengoreksi* data ya.\n\n"
 	}
-	text := fmt.Sprintf(
+	// Pesan 1: template kosong + panduan.
+	template := fmt.Sprintf(
 		"%s📝 *Sehatiku — Template Log Harian*\n\n"+
 			"Halo %s 👋\n"+
-			"Salin pesan di bawah, isi nilainya, lalu kirim balik. Kosongkan yang tidak ada.\n\n"+
+			"Isi template ini, atau salin *contoh di pesan berikutnya* lalu ganti angkanya, dan kirim balik. Kosongkan yang tidak ada.\n\n"+
 			"Gula: \n"+
 			"Tensi: \n"+
 			"Makan: \n"+
@@ -267,22 +268,30 @@ func (g *WhatsAppGateway) SendLogTemplate(ctx context.Context, toPhone, patientN
 			"Tidur: \n"+
 			"Berat: \n\n"+
 			"Cara isi: gula, olahraga, tidur, dan berat tulis angka; stres tulis angka 1-10; "+
-			"tensi tulis sistolik garis miring diastolik; obat tulis ya atau tidak; makan tulis nama menunya 🙏\n\n"+
-			"─────────────\n"+
-			"*Contoh yang sudah diisi:*\n\n"+
-			"Gula: 180\n"+
-			"Tensi: 120/80\n"+
-			"Makan: nasi goreng 1 piring\n"+
-			"Stres: 4\n"+
-			"Obat: ya\n"+
-			"Olahraga: 30\n"+
-			"Tidur: 7\n"+
-			"Berat: 65",
+			"tensi tulis sistolik garis miring diastolik; obat tulis ya atau tidak; makan tulis nama menunya 🙏",
 		note, patientName,
 	)
-	if err := g.sendText(ctx, toPhone, text); err != nil {
+	if err := g.sendText(ctx, toPhone, template); err != nil {
 		return fmt.Errorf("sending log template to %s: %w", toPhone, err)
 	}
+
+	// Pesan 2: contoh terisi sebagai bubble terpisah agar mudah disalin utuh lalu diedit.
+	// Sengaja TANPA frasa "template/log harian" supaya salinan yang sudah diedit tetap
+	// terparse sebagai log (bukan tertangkap ulang sebagai permintaan template).
+	example := "*Contoh (salin & ganti angkanya):*\n\n" +
+		"Gula: 180\n" +
+		"Tensi: 120/80\n" +
+		"Makan: nasi goreng 1 piring\n" +
+		"Stres: 4\n" +
+		"Obat: ya\n" +
+		"Olahraga: 30\n" +
+		"Tidur: 7\n" +
+		"Berat: 65"
+	if err := g.sendText(ctx, toPhone, example); err != nil {
+		// Bubble contoh best-effort — template inti sudah terkirim, jangan gagalkan alur.
+		g.Log.Warn("gagal kirim bubble contoh log template", zap.String("to", toPhone), zap.Error(err))
+	}
+
 	g.Log.Info("wa log template sent", zap.String("to", toPhone))
 	return nil
 }
