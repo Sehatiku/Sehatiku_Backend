@@ -88,7 +88,9 @@ func (u *NakesRegistrationUseCase) RegisterNakes(ctx context.Context, faskesID s
 		Role:           req.Role,
 		NIK:            req.NIK,
 		Alamat:         req.Alamat,
-		PhoneNumber:    req.PhoneNumber,
+		// Normalisasi ke 62... agar konsisten dengan nomor WA (warm-up credential &
+		// notifikasi). Lihat helper.NormalizePhoneID.
+		PhoneNumber:    helper.NormalizePhoneID(req.PhoneNumber),
 		Status:         entity.NakesStatusActive,
 		EnrolledAt:     now,
 		Specialization: req.Specialization,

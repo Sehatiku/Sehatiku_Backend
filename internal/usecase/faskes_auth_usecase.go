@@ -49,7 +49,9 @@ func (u *FaskesAuthUseCase) Register(ctx context.Context, req *model.FaskesRegis
 		Region:       req.Region,
 		Username:     req.Username,
 		PasswordHash: string(hash),
-		PhoneNumber:  req.PhoneNumber,
+		// Normalisasi ke 62... agar konsisten dengan nomor WA (warm-up credential &
+		// notifikasi). Lihat helper.NormalizePhoneID.
+		PhoneNumber:  helper.NormalizePhoneID(req.PhoneNumber),
 		Status:       "active",
 	}
 
