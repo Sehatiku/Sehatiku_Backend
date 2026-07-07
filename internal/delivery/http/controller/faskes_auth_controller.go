@@ -29,7 +29,7 @@ func (c *FaskesAuthController) Register(ctx *echo.Context) error {
 	}
 
 	if err := c.UseCase.Register(ctx.Request().Context(), req); err != nil {
-		if errors.Is(err, usecase.ErrUsernameAlreadyExists) {
+		if errors.Is(err, usecase.ErrUsernameAlreadyExists) || errors.Is(err, usecase.ErrPhoneAlreadyExists) {
 			return ctx.JSON(http.StatusConflict, model.WebResponse[any]{
 				Message: "conflict",
 				Errors:  err.Error(),

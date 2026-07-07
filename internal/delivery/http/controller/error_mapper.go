@@ -173,7 +173,8 @@ func mapHealthScoreError(ctx *echo.Context, err error) error {
 func mapRegistrationError(ctx *echo.Context, err error) error {
 	switch {
 	case errors.Is(err, usecase.ErrNIKAlreadyExists),
-		errors.Is(err, usecase.ErrUsernameAlreadyExists):
+		errors.Is(err, usecase.ErrUsernameAlreadyExists),
+		errors.Is(err, usecase.ErrPhoneAlreadyExists):
 		return ctx.JSON(http.StatusConflict, model.WebResponse[any]{
 			Message: "conflict",
 			Errors:  err.Error(),
