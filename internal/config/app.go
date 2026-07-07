@@ -52,6 +52,7 @@ func BootStrap(config *BootStrapConfig) {
 	patientClinicalBaselineRepo := &repository.PatientClinicalBaselineRepository{}
 	escalationRepo := &repository.EscalationRepository{}
 	devicePushTokenRepo := &repository.DevicePushTokenRepository{}
+	phoneRepo := &repository.PhoneRepository{}
 
 	// Gateways
 	ktpOCRBaseURL := config.Config.GetString("KTP_OCR_BASE_URL")
@@ -84,6 +85,7 @@ func BootStrap(config *BootStrapConfig) {
 		DB:          config.DB,
 		FaskesRepo:  faskesRepo,
 		SessionRepo: sessionRepo,
+		PhoneRepo:   phoneRepo,
 		JWT:         config.JWT,
 		Log:         config.Log,
 	}
@@ -110,6 +112,7 @@ func BootStrap(config *BootStrapConfig) {
 		DB:                config.DB,
 		NakesRepo:         nakesRepo,
 		FaskesRepo:        faskesRepo,
+		PhoneRepo:         phoneRepo,
 		NotificationRepo:  notificationRepo,
 		PendingCredential: pendingCredentialRepo,
 		OCRGateway:        ktpOCRGateway,
@@ -142,6 +145,7 @@ func BootStrap(config *BootStrapConfig) {
 		DB:                config.DB,
 		PatientRepo:       patientRepo,
 		NakesRepo:         nakesRepo,
+		PhoneRepo:         phoneRepo,
 		NotificationRepo:  notificationRepo,
 		PendingCredential: pendingCredentialRepo,
 		BaselineRepo:      patientClinicalBaselineRepo,

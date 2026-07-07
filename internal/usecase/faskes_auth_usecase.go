@@ -18,12 +18,21 @@ var (
 	ErrInvalidCredentials    = errors.New("username atau password salah")
 	ErrAccountInactive       = errors.New("akun tidak aktif")
 	ErrUsernameAlreadyExists = errors.New("username sudah digunakan")
+	ErrPhoneAlreadyExists    = errors.New("nomor telepon sudah terdaftar sebagai faskes, nakes, atau pasien lain")
 )
+
+// phoneChecker mengecek keunikan nomor telepon lintas tabel faskes/nakes/patients
+// (lihat repository.PhoneRepository.InUse). Interface agar dapat di-mock di test
+// tanpa menyentuh DB sungguhan.
+type phoneChecker interface {
+	InUse(db *gorm.DB, phone string) (bool, error)
+}
 
 type FaskesAuthUseCase struct {
 	DB          *gorm.DB
 	FaskesRepo  *repository.FaskesRepository
 	SessionRepo *repository.SessionRepository
+	PhoneRepo   phoneChecker
 	JWT         *helper.JWTHelper
 	Log         *zap.Logger
 }
@@ -35,6 +44,15 @@ func (u *FaskesAuthUseCase) Register(ctx context.Context, req *model.FaskesRegis
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return fmt.Errorf("checking username availability: %w", err)
+	}
+
+	phone := helper.NormalizePhoneID(req.PhoneNumber)
+	inUse, err := u.PhoneRepo.InUse(u.DB, phone)
+	if err != nil {
+		return err
+	}
+	if inUse {
+		return ErrPhoneAlreadyExists
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -51,7 +69,7 @@ func (u *FaskesAuthUseCase) Register(ctx context.Context, req *model.FaskesRegis
 		PasswordHash: string(hash),
 		// Normalisasi ke 62... agar konsisten dengan nomor WA (warm-up credential &
 		// notifikasi). Lihat helper.NormalizePhoneID.
-		PhoneNumber:  helper.NormalizePhoneID(req.PhoneNumber),
+		PhoneNumber:  phone,
 		Status:       "active",
 	}
 

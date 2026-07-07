@@ -38,6 +38,7 @@ type PatientRegistrationUseCase struct {
 	DB                *gorm.DB
 	PatientRepo       patientRepo
 	NakesRepo         patientRegNakesRepo
+	PhoneRepo         phoneChecker
 	NotificationRepo  notificationRepo
 	PendingCredential pendingCredentialStasher
 	BaselineRepo      baselineRepo
@@ -108,6 +109,24 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 		return nil, fmt.Errorf("checking username availability: %w", err)
 	}
 
+	phone := helper.NormalizePhoneID(req.PhoneNumber)
+	companionPhone := helper.NormalizePhoneID(req.CompanionPhone)
+	if companionPhone != "" && companionPhone == phone {
+		return nil, ErrPhoneAlreadyExists
+	}
+	if inUse, err := u.PhoneRepo.InUse(u.DB, phone); err != nil {
+		return nil, err
+	} else if inUse {
+		return nil, ErrPhoneAlreadyExists
+	}
+	if companionPhone != "" {
+		if inUse, err := u.PhoneRepo.InUse(u.DB, companionPhone); err != nil {
+			return nil, err
+		} else if inUse {
+			return nil, ErrPhoneAlreadyExists
+		}
+	}
+
 	dob, err := time.Parse("2006-01-02", req.DateOfBirth)
 	if err != nil {
 		return nil, fmt.Errorf("format date_of_birth tidak valid (gunakan YYYY-MM-DD): %w", err)
@@ -131,9 +150,9 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 		// pengirim WA (jid.User) saat pasien/pendamping mencatat log via WhatsApp, dan
 		// saat warm-up credential dikirim. Tanpa ini, "0812.."/"+62 812.." di DB tak
 		// pernah match "62812.." dari WA. Lihat helper.NormalizePhoneID.
-		PhoneNumber:     helper.NormalizePhoneID(req.PhoneNumber),
+		PhoneNumber:     phone,
 		CompanionName:   req.CompanionName,
-		CompanionPhone:  helper.NormalizePhoneID(req.CompanionPhone),
+		CompanionPhone:  companionPhone,
 		DateOfBirth:     &dob,
 		Sex:             req.Sex,
 		DiseaseType:     req.DiseaseType,

@@ -26,6 +26,7 @@ type NakesRegistrationUseCase struct {
 	DB                *gorm.DB
 	NakesRepo         nakesRepo
 	FaskesRepo        nakesRegFaskesRepo
+	PhoneRepo         phoneChecker
 	NotificationRepo  notificationRepo
 	PendingCredential pendingCredentialStasher
 	OCRGateway        *ocr.KTPOCRGateway
@@ -73,6 +74,15 @@ func (u *NakesRegistrationUseCase) RegisterNakes(ctx context.Context, faskesID s
 		return nil, fmt.Errorf("checking username availability: %w", err)
 	}
 
+	phone := helper.NormalizePhoneID(req.PhoneNumber)
+	inUse, err := u.PhoneRepo.InUse(u.DB, phone)
+	if err != nil {
+		return nil, err
+	}
+	if inUse {
+		return nil, ErrPhoneAlreadyExists
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("hashing password: %w", err)
@@ -88,9 +98,7 @@ func (u *NakesRegistrationUseCase) RegisterNakes(ctx context.Context, faskesID s
 		Role:           req.Role,
 		NIK:            req.NIK,
 		Alamat:         req.Alamat,
-		// Normalisasi ke 62... agar konsisten dengan nomor WA (warm-up credential &
-		// notifikasi). Lihat helper.NormalizePhoneID.
-		PhoneNumber:    helper.NormalizePhoneID(req.PhoneNumber),
+		PhoneNumber:    phone,
 		Status:         entity.NakesStatusActive,
 		EnrolledAt:     now,
 		Specialization: req.Specialization,

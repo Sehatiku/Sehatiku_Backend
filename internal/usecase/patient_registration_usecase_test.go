@@ -68,11 +68,18 @@ func (m *mockBaselineRepo) Create(_ *gorm.DB, _ *entity.PatientClinicalBaseline)
 	return nil
 }
 
+type mockPhoneRepo struct{ inUse bool }
+
+func (m *mockPhoneRepo) InUse(_ *gorm.DB, _ string) (bool, error) {
+	return m.inUse, nil
+}
+
 func newPatientRegUC(stasher pendingCredentialStasher, notif notificationRepo) *PatientRegistrationUseCase {
 	return &PatientRegistrationUseCase{
 		DB:                nil,
 		PatientRepo:       &mockPatientRepo{},
 		NakesRepo:         &mockRegNakesRepo{faskesID: "faskes-1"},
+		PhoneRepo:         &mockPhoneRepo{},
 		NotificationRepo:  notif,
 		PendingCredential: stasher,
 		BaselineRepo:      &mockBaselineRepo{},
@@ -182,6 +189,27 @@ func TestRegisterPatient_StashesWarmupAndReturnsCredentials(t *testing.T) {
 	// Dua baris audit notifikasi tercatat.
 	if notif.created != 2 {
 		t.Errorf("notifications created = %d; want 2", notif.created)
+	}
+}
+
+func TestRegisterPatient_RejectsPhoneAlreadyUsedByAnotherIdentity(t *testing.T) {
+	uc := newPatientRegUC(&mockStasher{}, &mockRegNotifRepo{})
+	uc.PhoneRepo = &mockPhoneRepo{inUse: true}
+
+	_, err := uc.RegisterPatient(context.Background(), "faskes-1", validPatientReq())
+	if !errors.Is(err, ErrPhoneAlreadyExists) {
+		t.Fatalf("err = %v; want ErrPhoneAlreadyExists", err)
+	}
+}
+
+func TestRegisterPatient_RejectsCompanionPhoneSameAsOwnPhone(t *testing.T) {
+	uc := newPatientRegUC(&mockStasher{}, &mockRegNotifRepo{})
+	req := validPatientReq()
+	req.CompanionPhone = req.PhoneNumber
+
+	_, err := uc.RegisterPatient(context.Background(), "faskes-1", req)
+	if !errors.Is(err, ErrPhoneAlreadyExists) {
+		t.Fatalf("err = %v; want ErrPhoneAlreadyExists", err)
 	}
 }
 
