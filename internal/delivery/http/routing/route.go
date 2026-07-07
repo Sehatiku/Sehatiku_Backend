@@ -87,6 +87,7 @@ func (r *RouteConfig) SetupNakesAuthedRoute() {
 	g.GET("/patients/:id", r.PatientController.GetNakesPatientDetail)
 	g.GET("/patients/:id/summary", r.SummaryController.GetNakesPatientSummary)
 	g.GET("/patients/:id/brief", r.SummaryController.GetNakesPatientBrief)
+	g.GET("/patients/:id/brief/report", r.SummaryController.GetNakesPatientBriefReport)
 	g.GET("/escalations", r.EscalationController.GetQueue)
 	g.PATCH("/escalations/:id/view", r.EscalationController.View)
 	g.PATCH("/escalations/:id/act", r.EscalationController.Act)

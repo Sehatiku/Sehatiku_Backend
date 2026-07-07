@@ -56,3 +56,18 @@ type BriefEscalation struct {
 	SentAt   time.Time  `json:"sent_at"`
 	ActedAt  *time.Time `json:"acted_at"`
 }
+
+// BriefReportData membungkus brief + identitas pasien untuk render laporan HTML
+// (GET /nakes/patients/:id/brief/report). Brief-nya persis sama dengan endpoint JSON.
+type BriefReportData struct {
+	Patient BriefPatientHeader
+	Brief   *PreVisitBriefResponse
+}
+
+// BriefPatientHeader — identitas pasien untuk kop laporan (tidak ada di PreVisitBriefResponse).
+type BriefPatientHeader struct {
+	FullName    string
+	AgeYears    *int   // nil bila DateOfBirth tidak diketahui
+	Sex         string // male|female
+	DiseaseType string // diabetes_t2|hypertension|both
+}

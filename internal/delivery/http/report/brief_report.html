@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pre-Visit Brief — {{.Patient.FullName}}</title>
+<style>
+  :root { --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --bg:#ffffff; --brand:#0d9488; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); background: #f3f4f6; margin: 0; line-height: 1.45; font-size: 13px;
+  }
+  .page { max-width: 820px; margin: 16px auto; background: var(--bg); padding: 28px 32px 40px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  header { border-bottom: 3px solid var(--brand); padding-bottom: 12px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .brand { font-size: 20px; font-weight: 700; color: var(--brand); letter-spacing: .5px; }
+  .doc-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .patient-name { font-size: 17px; font-weight: 700; margin-top: 6px; }
+  .patient-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .head-right { text-align: right; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--brand); border-bottom: 1px solid var(--line); padding-bottom: 4px; margin: 22px 0 10px; }
+  section { break-inside: avoid; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .chip { background: #f3f4f6; border-radius: 12px; padding: 3px 10px; font-size: 11px; color: #374151; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+  .risk-card { display: flex; align-items: center; gap: 18px; border: 1px solid var(--line); border-left: 5px solid {{.RiskColor}}; border-radius: 8px; padding: 14px 18px; }
+  .risk-score { font-size: 40px; font-weight: 800; line-height: 1; color: {{.RiskColor}}; }
+  .badge { display: inline-block; background: {{.RiskColor}}; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 10px; text-transform: uppercase; letter-spacing: .5px; }
+  ul { margin: 6px 0; padding-left: 18px; }
+  li { margin: 3px 0; }
+  .muted { color: var(--muted); }
+  .chart-box { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .chart-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .chart-sub { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .narrative { background: #f9fafb; border-radius: 8px; padding: 12px 16px; font-size: 13px; }
+  footer { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 10px; color: var(--muted); }
+  @media print {
+    body { background: #fff; font-size: 11.5px; }
+    .page { box-shadow: none; margin: 0; max-width: none; padding: 0 8mm; }
+    section { break-inside: avoid; }
+    @page { size: A4; margin: 12mm; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div>
+      <div class="brand">Sehatiku</div>
+      <div class="doc-title">Pre-Visit Prolanis Brief</div>
+      <div class="patient-name">{{.Patient.FullName}}</div>
+      <div class="patient-meta">
+        {{intp .Patient.AgeYears}} th &middot; {{sexLabel .Patient.Sex}} &middot; {{diseaseLabel .Patient.DiseaseType}}
+      </div>
+    </div>
+    <div class="head-right">
+      Periode: {{.B.Period.Start}} &ndash; {{.B.Period.End}}<br>
+      Dibuat: {{wibDateTime .B.GeneratedAt}}
+    </div>
+  </header>
+
+  <div class="chips">
+    <span class="chip">Hari tercatat: {{.B.Coverage.LoggedDays}}/{{.B.Coverage.WindowDays}}</span>
+    <span class="chip">Streak: {{.B.Coverage.StreakDays}} hari</span>
+    <span class="chip">Riwayat data: {{.B.HistoryDays}} hari</span>
+  </div>
+
+  <!-- Risk -->
+  <section>
+    <h2>Skor Risiko</h2>
+    {{if .B.Risk}}
+    <div class="risk-card">
+      <div class="risk-score">{{.B.Risk.Score}}</div>
+      <div>
+        <span class="badge">{{statusLabel .B.Risk.Status}}</span>
+        <div class="muted" style="margin-top:6px">
+          Mode: {{.B.Risk.ScoringMode}} &middot; Diskor: {{wibDateTime .B.Risk.ScoredAt}}
+        </div>
+        {{if .B.Risk.TopFactors}}
+        <ul>{{range .B.Risk.TopFactors}}<li>{{.}}</li>{{end}}</ul>
+        {{end}}
+      </div>
+    </div>
+    {{else}}
+    <p class="muted">Belum pernah diskor.</p>
+    {{end}}
+  </section>
+
+  <!-- Trends -->
+  <section>
+    <h2>Trajektori 30 Hari</h2>
+    <div class="grid2">
+      <div class="chart-box">
+        <div class="chart-title">Gula Darah (mg/dL)</div>
+        <div class="chart-sub">Tren: {{slopeText .B.Trajectory.GlucoseSlopePerWeek " mg/dL"}}</div>
+        {{.GlucoseChart}}
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">Tekanan Darah (mmHg)</div>
+        <div class="chart-sub">Sistolik (merah) &middot; Diastolik (kuning) &middot; Tren sistolik: {{slopeText .B.Trajectory.SystolicSlopePerWeek " mmHg"}}</div>
+        {{.BPChart}}
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">Berat Badan (kg)</div>
+        <div class="chart-sub">&nbsp;</div>
+        {{.WeightChart}}
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">Frekuensi Lupa Obat per Hari</div>
+        <div class="chart-sub">Jumlah hari lupa menurut nama hari</div>
+        {{.AdherenceChart}}
+      </div>
+    </div>
+  </section>
+
+  <!-- Aggregates -->
+  {{with .B.Aggregates}}
+  <section>
+    <h2>Ringkasan Angka (30 hari)</h2>
+    <table>
+      <tbody>
+        {{with .Glucose}}<tr><th>Gula darah</th><td>Rata-rata {{f1 .AvgMgDl}} &middot; min {{f1 .MinMgDl}} &middot; maks {{f1 .MaxMgDl}} mg/dL ({{.Count}}x)</td></tr>{{end}}
+        {{with .BloodPressure}}<tr><th>Tekanan darah</th><td>Rata-rata {{f1 .AvgSystolic}}/{{f1 .AvgDiastolic}} mmHg ({{.Count}}x)</td></tr>{{end}}
+        {{with .MedAdherence}}<tr><th>Kepatuhan obat</th><td>{{f1 .AdherenceRatePct}}% ({{.Count}} hari)</td></tr>{{end}}
+        {{with .Weight}}<tr><th>Berat badan</th><td>{{f1 .StartKg}} &rarr; {{f1 .LatestKg}} kg (Δ {{f1 .DeltaKg}} kg)</td></tr>{{end}}
+        {{with .Nutrition}}<tr><th>Nutrisi</th><td>{{f1 .AvgKcalPerDay}} kkal/hari &middot; karbo {{f1 .AvgCarbsGPerDay}} g &middot; natrium {{f1 .AvgSodiumMgPerDay}} mg ({{.MealCount}} makan)</td></tr>{{end}}
+        {{with .Activity}}<tr><th>Aktivitas</th><td>Rata-rata {{f1 .AvgMinutesPerDay}} mnt/hari &middot; total {{f1 .TotalMinutes}} mnt</td></tr>{{end}}
+        {{with .Sleep}}<tr><th>Tidur</th><td>Rata-rata {{f1 .AvgHours}} jam ({{.Count}}x)</td></tr>{{end}}
+        {{with .Stress}}<tr><th>Stres</th><td>Rata-rata level {{f1 .AvgLevel}} ({{.Count}}x)</td></tr>{{end}}
+      </tbody>
+    </table>
+  </section>
+  {{end}}
+
+  <!-- Med adherence detail -->
+  <section>
+    <h2>Kepatuhan Obat</h2>
+    <div class="chips">
+      <span class="chip">Kepatuhan: {{f1 .B.MedAdherence.AdherenceRatePct}}%</span>
+      <span class="chip">Minum: {{.B.MedAdherence.TakenDays}} hari</span>
+      <span class="chip">Lupa: {{.B.MedAdherence.MissedDays}} hari</span>
+    </div>
+    {{if .B.MedAdherence.MissedDates}}
+    <p class="muted" style="margin-top:8px">Tanggal lupa: {{range $i, $d := .B.MedAdherence.MissedDates}}{{if $i}}, {{end}}{{$d}}{{end}}</p>
+    {{end}}
+  </section>
+
+  <!-- Escalations -->
+  <section>
+    <h2>Eskalasi Bulan Ini</h2>
+    {{if .B.EscalationsThisMonth}}
+    <table>
+      <thead><tr><th>Tier</th><th>Status</th><th>Feedback</th><th>Dikirim</th><th>Ditindak</th></tr></thead>
+      <tbody>
+        {{range .B.EscalationsThisMonth}}
+        <tr>
+          <td>{{tierLabel .Tier}}</td>
+          <td>{{statusLabel .Status}}</td>
+          <td>{{feedbackLabel .Feedback}}</td>
+          <td>{{wibDateTime .SentAt}}</td>
+          <td>{{wibDateTimePtr .ActedAt}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="muted">Tidak ada eskalasi bulan ini.</p>
+    {{end}}
+  </section>
+
+  <!-- Narrative -->
+  <section>
+    <h2>Narasi Klinis &amp; Anamnesis</h2>
+    <div class="narrative">{{.B.Narrative}}</div>
+    {{if .B.AnamnesisQuestions}}
+    <p style="margin-top:10px; font-weight:600">Draft pertanyaan anamnesis:</p>
+    <ol>{{range .B.AnamnesisQuestions}}<li>{{.}}</li>{{end}}</ol>
+    {{end}}
+  </section>
+
+  <footer>
+    Laporan ini dibuat otomatis oleh Sehatiku pada {{wibDateTime .B.GeneratedAt}} sebagai alat bantu
+    pengambilan keputusan (decision-support), bukan diagnosis. Interpretasi akhir tetap pada penilaian klinis nakes.
+  </footer>
+
+</div>
+</body>
+</html>

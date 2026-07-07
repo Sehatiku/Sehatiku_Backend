@@ -46,6 +46,55 @@ type briefEscalationRepo interface {
 	FindByPatientSince(db *gorm.DB, patientID string, since time.Time) ([]repository.EscalationBriefRow, error)
 }
 
+// GetNakesPatientBriefReport mengambil brief + identitas pasien untuk render laporan HTML.
+// Reuse penuh GetNakesPatientBrief (cache Redis 24 jam + narasi Gemini) — hanya menambah
+// kop pasien untuk laporan.
+func (u *SummaryUseCase) GetNakesPatientBriefReport(ctx context.Context, faskesID, patientID string) (*model.BriefReportData, error) {
+	// ponytail: double patient fetch (di sini + di dalam brief) — dua read terindeks yang
+	// murah, tidak sepadan dengan menembuskan entity lewat signature brief.
+	patient, err := u.PatientRepo.FindByID(u.DB, patientID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPatientNotFound
+		}
+		return nil, fmt.Errorf("finding patient %s: %w", patientID, err)
+	}
+	if patient.FaskesID != faskesID {
+		return nil, ErrPatientNotFound
+	}
+
+	brief, err := u.GetNakesPatientBrief(ctx, faskesID, patientID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.BriefReportData{
+		Patient: model.BriefPatientHeader{
+			FullName:    patient.FullName,
+			AgeYears:    ageYears(patient.DateOfBirth),
+			Sex:         patient.Sex,
+			DiseaseType: patient.DiseaseType,
+		},
+		Brief: brief,
+	}, nil
+}
+
+// ageYears menghitung umur (tahun penuh) dari tanggal lahir, nil bila tidak diketahui.
+func ageYears(dob *time.Time) *int {
+	if dob == nil {
+		return nil
+	}
+	now := time.Now().In(wibLocation)
+	y := now.Year() - dob.Year()
+	if now.YearDay() < dob.YearDay() {
+		y--
+	}
+	if y < 0 {
+		return nil
+	}
+	return &y
+}
+
 // GetNakesPatientBrief menyusun Pre-Visit Brief satu pasien untuk nakes. Tenancy:
 // pasien milik faskes lain dikembalikan sebagai not-found (pola GetNakesPatientSummary).
 func (u *SummaryUseCase) GetNakesPatientBrief(ctx context.Context, faskesID, patientID string) (*model.PreVisitBriefResponse, error) {
