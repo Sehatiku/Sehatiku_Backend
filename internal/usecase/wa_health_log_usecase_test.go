@@ -43,13 +43,25 @@ func (m *mockWALogRepo) Create(_ *gorm.DB, log *entity.HealthLog) error {
 }
 
 type mockWAReplySender struct {
-	confirmationCalls   int
-	parseErrorCalls     int
-	notRegisteredCalls  int
+	confirmationCalls  int
+	batchCalls         int
+	batchItems         []string
+	templateCalls      int
+	parseErrorCalls    int
+	notRegisteredCalls int
 }
 
 func (m *mockWAReplySender) SendHealthLogConfirmation(_ context.Context, _, _, _, _ string) error {
 	m.confirmationCalls++
+	return nil
+}
+func (m *mockWAReplySender) SendHealthLogBatchConfirmation(_ context.Context, _, _ string, items []string) error {
+	m.batchCalls++
+	m.batchItems = items
+	return nil
+}
+func (m *mockWAReplySender) SendLogTemplate(_ context.Context, _, _ string) error {
+	m.templateCalls++
 	return nil
 }
 func (m *mockWAReplySender) SendHealthLogParseError(_ context.Context, _ string) error {
@@ -237,6 +249,80 @@ func TestWAHealthLog_MeasuredAt_IsNow(t *testing.T) {
 	// tapi tidak boleh jauh di luar window before/after.
 	if measuredAt.Before(before.Add(-time.Second)) || measuredAt.After(after.Add(time.Second)) {
 		t.Errorf("measuredAt %v di luar window [%v, %v]", measuredAt, before, after)
+	}
+}
+
+func TestWAHealthLog_TemplateRequest(t *testing.T) {
+	pr := &mockWAPatientRepo{byPhone: testPatient}
+	lr := &mockWALogRepo{}
+	wa := &mockWAReplySender{}
+	uc := newWAHealthLogUC(pr, lr, wa)
+
+	if err := uc.HandleInbound(context.Background(), "628111222333", "saya ingin tulis log harian"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wa.templateCalls != 1 {
+		t.Errorf("templateCalls = %d; want 1", wa.templateCalls)
+	}
+	if len(lr.created) != 0 {
+		t.Errorf("expected no log created, got %d", len(lr.created))
+	}
+	if wa.confirmationCalls != 0 || wa.parseErrorCalls != 0 {
+		t.Errorf("template request should not confirm/parse-error")
+	}
+}
+
+func TestWAHealthLog_MultiMetricForm(t *testing.T) {
+	pr := &mockWAPatientRepo{byPhone: testPatient}
+	lr := &mockWALogRepo{}
+	wa := &mockWAReplySender{}
+	uc := newWAHealthLogUC(pr, lr, wa)
+
+	msg := "Gula: 180\nTensi: 120/80\nObat: tidak\nBerat: 65"
+	if err := uc.HandleInbound(context.Background(), "628111222333", msg); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(lr.created) != 4 {
+		t.Fatalf("expected 4 logs, got %d", len(lr.created))
+	}
+	if wa.batchCalls != 1 {
+		t.Errorf("batchCalls = %d; want 1", wa.batchCalls)
+	}
+	if wa.confirmationCalls != 0 {
+		t.Errorf("single confirmation should not fire for a form; got %d", wa.confirmationCalls)
+	}
+	// Cari metrik obat — nilai "tidak" harus tersimpan sebagai 0, bukan 100.
+	var found bool
+	for _, l := range lr.created {
+		if l.MetricType == "med_adherence" {
+			found = true
+			if l.ValueNumeric == nil || *l.ValueNumeric != 0 {
+				t.Errorf("obat 'tidak' = %v; want 0", l.ValueNumeric)
+			}
+		}
+		if l.Source != entity.LogSourceWhatsApp {
+			t.Errorf("source = %s; want whatsapp", l.Source)
+		}
+	}
+	if !found {
+		t.Error("med_adherence log not found in form")
+	}
+}
+
+// Baris terisi sebagian: kolom kosong & placeholder underscore harus dilewati,
+// hanya baris berisi yang tercatat.
+func TestWAHealthLog_PartialForm(t *testing.T) {
+	pr := &mockWAPatientRepo{byPhone: testPatient}
+	lr := &mockWALogRepo{}
+	wa := &mockWAReplySender{}
+	uc := newWAHealthLogUC(pr, lr, wa)
+
+	msg := "Gula: 200\nTensi: \nObat: ___\nBerat: 70"
+	if err := uc.HandleInbound(context.Background(), "628111222333", msg); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(lr.created) != 2 {
+		t.Fatalf("expected 2 logs (gula, berat), got %d", len(lr.created))
 	}
 }
 

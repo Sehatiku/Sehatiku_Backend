@@ -32,6 +32,8 @@ type waHealthLogRepo interface {
 // Di-interface-kan agar usecase bisa diuji dengan mock (pemanggilan WA mahal/eksternal).
 type waReplySender interface {
 	SendHealthLogConfirmation(ctx context.Context, toPhone, patientName, metricLabel, valueStr string) error
+	SendHealthLogBatchConfirmation(ctx context.Context, toPhone, patientName string, items []string) error
+	SendLogTemplate(ctx context.Context, toPhone, patientName string) error
 	SendHealthLogParseError(ctx context.Context, toPhone string) error
 	SendHealthLogNotRegistered(ctx context.Context, toPhone string) error
 }
@@ -72,49 +74,90 @@ func (u *WAHealthLogUseCase) HandleInbound(ctx context.Context, senderPhone, mes
 		return nil
 	}
 
-	parsed := helper.ParseWAMessage(messageText)
-	if parsed.Err != nil {
-		// Pesan tidak dikenali — kirim panduan format
-		u.Log.Debug("wa message not parsed",
-			zap.String("patient_id", patient.ID),
-			zap.String("sender", helper.MaskPhone(senderPhone)),
-			zap.Error(parsed.Err),
-		)
+	// Permintaan template ("saya ingin tulis log harian", "menu lapor", dll):
+	// balas form kosong untuk diisi, jangan coba parse sebagai metrik.
+	if helper.IsLogTemplateRequest(messageText) {
+		u.replyTemplate(ctx, senderPhone, patient.FullName)
+		return nil
+	}
+
+	// Coba parse sebagai FORM template multi-metrik ("Gula: 180\nTensi: 120/80\n...").
+	// Bila bukan form (tak ada baris "label: nilai" terisi), fallback ke parser
+	// teks-bebas satu-metrik ("gula 180") demi kompatibilitas dengan alur lama.
+	parsedList := helper.ParseLogForm(messageText)
+	if len(parsedList) == 0 {
+		single := helper.ParseWAMessage(messageText)
+		if single.Err != nil {
+			u.Log.Debug("wa message not parsed",
+				zap.String("patient_id", patient.ID),
+				zap.String("sender", helper.MaskPhone(senderPhone)),
+				zap.Error(single.Err),
+			)
+			u.replyParseError(ctx, senderPhone)
+			return nil
+		}
+		parsedList = []helper.ParsedMetric{single}
+	}
+
+	now := time.Now()
+	var logs []*entity.HealthLog
+	var lines []metricLine
+	for _, parsed := range parsedList {
+		log, err := u.buildLog(patient.ID, loggedBy, parsed, now)
+		if err != nil {
+			// Validasi range gagal untuk baris ini — lewati baris, tetap proses sisanya.
+			u.Log.Debug("wa health log value invalid",
+				zap.String("patient_id", patient.ID),
+				zap.String("metric_type", parsed.MetricType),
+				zap.Error(err),
+			)
+			continue
+		}
+		// Enrichment makanan via NER — fire-and-forget degradasi anggun (ML opsional)
+		if parsed.MetricType == "food" && u.Extractor != nil && log.ValueText != nil {
+			enrichFoodJSONB(ctx, u.Extractor, log, *log.ValueText, u.Log)
+		}
+		logs = append(logs, log)
+		label, valueStr := metricDisplay(parsed)
+		lines = append(lines, metricLine{label, valueStr})
+	}
+
+	if len(logs) == 0 {
+		// Semua baris tak lolos validasi (mis. nilai di luar range) — kirim panduan.
 		u.replyParseError(ctx, senderPhone)
 		return nil
 	}
 
-	log, err := u.buildLog(patient.ID, loggedBy, parsed, time.Now())
-	if err != nil {
-		// Validasi range gagal — kirim panduan format dengan detail error
-		u.Log.Debug("wa health log value invalid",
-			zap.String("patient_id", patient.ID),
-			zap.String("metric_type", parsed.MetricType),
-			zap.Error(err),
-		)
-		u.replyParseError(ctx, senderPhone)
-		return nil
-	}
-
-	// Enrichment makanan via NER — fire-and-forget degradasi anggun (ML opsional)
-	if parsed.MetricType == "food" && u.Extractor != nil && log.ValueText != nil {
-		enrichFoodJSONB(ctx, u.Extractor, log, *log.ValueText, u.Log)
-	}
-
-	if err := u.LogRepo.Create(u.DB, log); err != nil {
-		return fmt.Errorf("inserting wa health log for patient %s: %w", patient.ID, err)
+	// ponytail: insert per-baris tanpa transaksi. health_logs insert-only & jalur ini
+	// fire-and-forget; bila baris ke-N gagal, baris sebelumnya sudah tersimpan (acceptable
+	// untuk logging harian). Bungkus di u.DB.Transaction bila butuh atomicity — tapi itu
+	// men-deref nil DB pada unit test yang memakai mock repo.
+	for _, log := range logs {
+		if err := u.LogRepo.Create(u.DB, log); err != nil {
+			return fmt.Errorf("inserting wa health log for patient %s: %w", patient.ID, err)
+		}
 	}
 
 	u.Log.Info("wa health log created",
 		zap.String("patient_id", patient.ID),
-		zap.String("metric_type", log.MetricType),
+		zap.Int("count", len(logs)),
 		zap.String("logged_by", loggedBy),
 	)
 
-	label, valueStr := metricDisplay(parsed)
-	u.replyConfirmation(ctx, senderPhone, patient.FullName, label, valueStr)
+	if len(lines) == 1 {
+		u.replyConfirmation(ctx, senderPhone, patient.FullName, lines[0].label, lines[0].value)
+	} else {
+		items := make([]string, len(lines))
+		for i, l := range lines {
+			items[i] = l.label + ": " + l.value
+		}
+		u.replyBatchConfirmation(ctx, senderPhone, patient.FullName, items)
+	}
 	return nil
 }
+
+// metricLine menampung label+nilai tampilan satu metrik untuk menyusun pesan konfirmasi.
+type metricLine struct{ label, value string }
 
 // lookupPatient mencari pasien berdasarkan nomor WA pengirim. Mencoba phone_number dulu
 // (pasien sendiri), lalu companion_phone (pendamping). Mengembalikan (nil, "", nil) bila
@@ -284,6 +327,26 @@ func (u *WAHealthLogUseCase) replyConfirmation(ctx context.Context, toPhone, pat
 	}
 	if err := u.WhatsApp.SendHealthLogConfirmation(ctx, toPhone, patientName, label, value); err != nil {
 		u.Log.Warn("gagal kirim konfirmasi health log WA",
+			zap.String("phone", helper.MaskPhone(toPhone)), zap.Error(err))
+	}
+}
+
+func (u *WAHealthLogUseCase) replyBatchConfirmation(ctx context.Context, toPhone, patientName string, items []string) {
+	if u.WhatsApp == nil {
+		return
+	}
+	if err := u.WhatsApp.SendHealthLogBatchConfirmation(ctx, toPhone, patientName, items); err != nil {
+		u.Log.Warn("gagal kirim konfirmasi batch health log WA",
+			zap.String("phone", helper.MaskPhone(toPhone)), zap.Error(err))
+	}
+}
+
+func (u *WAHealthLogUseCase) replyTemplate(ctx context.Context, toPhone, patientName string) {
+	if u.WhatsApp == nil {
+		return
+	}
+	if err := u.WhatsApp.SendLogTemplate(ctx, toPhone, patientName); err != nil {
+		u.Log.Warn("gagal kirim template log harian WA",
 			zap.String("phone", helper.MaskPhone(toPhone)), zap.Error(err))
 	}
 }

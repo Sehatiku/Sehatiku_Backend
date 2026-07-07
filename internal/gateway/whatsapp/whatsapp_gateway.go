@@ -227,6 +227,49 @@ func (g *WhatsAppGateway) SendHealthLogConfirmation(ctx context.Context, toPhone
 	return nil
 }
 
+// SendHealthLogBatchConfirmation mengirim konfirmasi untuk beberapa metrik sekaligus
+// (hasil pengisian template log harian). `items` sudah berformat "Label: nilai".
+func (g *WhatsAppGateway) SendHealthLogBatchConfirmation(ctx context.Context, toPhone, patientName string, items []string) error {
+	var b strings.Builder
+	fmt.Fprintf(&b, "✅ *Sehatiku — Data Berhasil Dicatat*\n\nHalo %s 👋\n\nKami sudah menyimpan:\n", patientName)
+	for _, it := range items {
+		b.WriteString("• ")
+		b.WriteString(it)
+		b.WriteString("\n")
+	}
+	b.WriteString("\nTerima kasih sudah rutin mencatat ya 💙")
+	if err := g.sendText(ctx, toPhone, b.String()); err != nil {
+		return fmt.Errorf("sending batch health log confirmation to %s: %w", toPhone, err)
+	}
+	g.Log.Info("wa health log batch confirmation sent", zap.String("to", toPhone), zap.Int("count", len(items)))
+	return nil
+}
+
+// SendLogTemplate mengirim template log harian kosong untuk diisi pasien/pendamping,
+// dipicu saat pengirim meminta panduan (mis. "saya ingin tulis log harian"). Kolom
+// sengaja TANPA contoh berangka: bila seluruh pesan ini kebetulan disalin & dikirim
+// balik tanpa diisi, tidak ada baris yang keliru terparse sebagai metrik.
+func (g *WhatsAppGateway) SendLogTemplate(ctx context.Context, toPhone, patientName string) error {
+	text := fmt.Sprintf(
+		"📝 *Sehatiku — Template Log Harian*\n\n"+
+			"Halo %s 👋\n"+
+			"Salin pesan di bawah, isi nilainya, lalu kirim balik. Kosongkan yang tidak ada.\n\n"+
+			"Gula: \n"+
+			"Tensi: \n"+
+			"Obat: \n"+
+			"Olahraga: \n"+
+			"Tidur: \n"+
+			"Berat: \n\n"+
+			"Cara isi: gula, olahraga, tidur, dan berat tulis angka; tensi tulis sistolik garis miring diastolik; obat tulis ya atau tidak 🙏",
+		patientName,
+	)
+	if err := g.sendText(ctx, toPhone, text); err != nil {
+		return fmt.Errorf("sending log template to %s: %w", toPhone, err)
+	}
+	g.Log.Info("wa log template sent", zap.String("to", toPhone))
+	return nil
+}
+
 // SendHealthLogParseError mengirim panduan format pesan yang benar ketika
 // bot tidak bisa mengenali metrik dari pesan yang dikirim pasien/pendamping.
 func (g *WhatsAppGateway) SendHealthLogParseError(ctx context.Context, toPhone string) error {
