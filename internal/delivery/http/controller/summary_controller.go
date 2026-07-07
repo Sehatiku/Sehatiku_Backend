@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"sehatiku-backend/internal/delivery/http/report"
 	"sehatiku-backend/internal/model"
 	"strconv"
 
@@ -13,6 +14,7 @@ type patientSummaryUseCase interface {
 	GetPatientSummary(ctx context.Context, patientID string, window int) (*model.SummaryResponse, error)
 	GetNakesPatientSummary(ctx context.Context, faskesID, patientID string, window int) (*model.SummaryResponse, error)
 	GetNakesPatientBrief(ctx context.Context, faskesID, patientID string) (*model.PreVisitBriefResponse, error)
+	GetNakesPatientBriefReport(ctx context.Context, faskesID, patientID string) (*model.BriefReportData, error)
 }
 
 type SummaryController struct {
@@ -79,6 +81,31 @@ func (c *SummaryController) GetNakesPatientBrief(ctx *echo.Context) error {
 		Message: "pre-visit brief pasien berhasil diambil",
 		Data:    data,
 	})
+}
+
+// GetNakesPatientBriefReport — laporan HTML siap-cetak dari Pre-Visit Brief (Print→PDF).
+// Sukses = text/html; error tetap JSON (via mapSummaryError) seperti endpoint brief.
+func (c *SummaryController) GetNakesPatientBriefReport(ctx *echo.Context) error {
+	claims := getNakesClaimsFromCtx(ctx)
+	patientID := ctx.Param("id")
+	if patientID == "" {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
+			Message: "bad request",
+			Errors:  "patient id wajib diisi",
+		})
+	}
+
+	data, err := c.UseCase.GetNakesPatientBriefReport(ctx.Request().Context(), claims.FaskesID, patientID)
+	if err != nil {
+		return mapSummaryError(ctx, err)
+	}
+
+	html, err := report.RenderBrief(data)
+	if err != nil {
+		return mapSummaryError(ctx, err)
+	}
+
+	return ctx.HTML(http.StatusOK, html)
 }
 
 // parseWindowParam membaca query param window. Kosong -> default 7; nilai non-integer -> 0
