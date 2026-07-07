@@ -26,6 +26,7 @@ type waPatientRepo interface {
 // meng-inherit interface itu untuk menghindari dependensi silang antar file.
 type waHealthLogRepo interface {
 	Create(db *gorm.DB, log *entity.HealthLog) error
+	HasLogToday(db *gorm.DB, patientID string) (bool, error)
 }
 
 // waReplySender adalah interface outbound untuk balasan WA ke pasien/pendamping.
@@ -33,7 +34,7 @@ type waHealthLogRepo interface {
 type waReplySender interface {
 	SendHealthLogConfirmation(ctx context.Context, toPhone, patientName, metricLabel, valueStr string) error
 	SendHealthLogBatchConfirmation(ctx context.Context, toPhone, patientName string, items []string) error
-	SendLogTemplate(ctx context.Context, toPhone, patientName string) error
+	SendLogTemplate(ctx context.Context, toPhone, patientName string, alreadyLoggedToday bool) error
 	SendHealthLogParseError(ctx context.Context, toPhone string) error
 	SendHealthLogNotRegistered(ctx context.Context, toPhone string) error
 }
@@ -75,9 +76,18 @@ func (u *WAHealthLogUseCase) HandleInbound(ctx context.Context, senderPhone, mes
 	}
 
 	// Permintaan template ("saya ingin tulis log harian", "menu lapor", dll):
-	// balas form kosong untuk diisi, jangan coba parse sebagai metrik.
+	// balas form kosong untuk diisi, jangan coba parse sebagai metrik. Bila pasien
+	// sudah mencatat hari ini, sertakan catatan (opsi 2 — tidak memblokir, hanya
+	// memberi konteks agar tak resubmit tak sengaja).
 	if helper.IsLogTemplateRequest(messageText) {
-		u.replyTemplate(ctx, senderPhone, patient.FullName)
+		loggedToday, err := u.LogRepo.HasLogToday(u.DB, patient.ID)
+		if err != nil {
+			// Cek konteks best-effort — jangan gagalkan pengiriman template.
+			u.Log.Warn("gagal cek log hari ini untuk template WA",
+				zap.String("patient_id", patient.ID), zap.Error(err))
+			loggedToday = false
+		}
+		u.replyTemplate(ctx, senderPhone, patient.FullName, loggedToday)
 		return nil
 	}
 
@@ -341,11 +351,11 @@ func (u *WAHealthLogUseCase) replyBatchConfirmation(ctx context.Context, toPhone
 	}
 }
 
-func (u *WAHealthLogUseCase) replyTemplate(ctx context.Context, toPhone, patientName string) {
+func (u *WAHealthLogUseCase) replyTemplate(ctx context.Context, toPhone, patientName string, alreadyLoggedToday bool) {
 	if u.WhatsApp == nil {
 		return
 	}
-	if err := u.WhatsApp.SendLogTemplate(ctx, toPhone, patientName); err != nil {
+	if err := u.WhatsApp.SendLogTemplate(ctx, toPhone, patientName, alreadyLoggedToday); err != nil {
 		u.Log.Warn("gagal kirim template log harian WA",
 			zap.String("phone", helper.MaskPhone(toPhone)), zap.Error(err))
 	}

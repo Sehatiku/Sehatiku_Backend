@@ -28,6 +28,23 @@ func (r *HealthLogRepository) FindByID(db *gorm.DB, id string) (*entity.HealthLo
 	return &log, nil
 }
 
+// HasLogToday melaporkan apakah pasien sudah punya health_log HARI INI (zona WIB/
+// Asia/Jakarta, konsisten dengan logged_today dashboard & HasExtremeReadingToday).
+// Dipakai jalur WA untuk memberi konteks "sudah mencatat hari ini" saat pasien
+// meminta template lagi — tidak memblokir input, hanya menandai.
+func (r *HealthLogRepository) HasLogToday(db *gorm.DB, patientID string) (bool, error) {
+	var count int64
+	err := db.Model(&entity.HealthLog{}).
+		Where(`patient_id = ?
+			AND (measured_at AT TIME ZONE 'Asia/Jakarta')::date = (now() AT TIME ZONE 'Asia/Jakarta')::date`,
+			patientID).
+		Count(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("checking today's log for patient %s: %w", patientID, err)
+	}
+	return count > 0, nil
+}
+
 // HasExtremeReadingToday melaporkan apakah pasien punya pembacaan ekstrem HARI INI (WIB):
 // gula >= glucoseHigh atau <= glucoseLow, atau tensi sistolik >= systolicHigh / diastolik
 // >= diastolicHigh. Dipakai sebagai pemicu eskalasi acute selain transisi status ke bahaya.

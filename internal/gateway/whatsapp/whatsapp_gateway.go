@@ -249,9 +249,13 @@ func (g *WhatsAppGateway) SendHealthLogBatchConfirmation(ctx context.Context, to
 // dipicu saat pengirim meminta panduan (mis. "saya ingin tulis log harian"). Kolom
 // sengaja TANPA contoh berangka: bila seluruh pesan ini kebetulan disalin & dikirim
 // balik tanpa diisi, tidak ada baris yang keliru terparse sebagai metrik.
-func (g *WhatsAppGateway) SendLogTemplate(ctx context.Context, toPhone, patientName string) error {
+func (g *WhatsAppGateway) SendLogTemplate(ctx context.Context, toPhone, patientName string, alreadyLoggedToday bool) error {
+	note := ""
+	if alreadyLoggedToday {
+		note = "ℹ️ Anda sudah mencatat log hari ini. Kirim lagi hanya kalau mau *menambah* atau *mengoreksi* data ya.\n\n"
+	}
 	text := fmt.Sprintf(
-		"📝 *Sehatiku — Template Log Harian*\n\n"+
+		"%s📝 *Sehatiku — Template Log Harian*\n\n"+
 			"Halo %s 👋\n"+
 			"Salin pesan di bawah, isi nilainya, lalu kirim balik. Kosongkan yang tidak ada.\n\n"+
 			"Gula: \n"+
@@ -274,7 +278,7 @@ func (g *WhatsAppGateway) SendLogTemplate(ctx context.Context, toPhone, patientN
 			"Olahraga: 30\n"+
 			"Tidur: 7\n"+
 			"Berat: 65",
-		patientName,
+		note, patientName,
 	)
 	if err := g.sendText(ctx, toPhone, text); err != nil {
 		return fmt.Errorf("sending log template to %s: %w", toPhone, err)

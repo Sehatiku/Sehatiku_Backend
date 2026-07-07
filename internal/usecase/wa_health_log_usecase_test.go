@@ -30,8 +30,9 @@ func (m *mockWAPatientRepo) FindByCompanionPhone(_ *gorm.DB, _ string) (*entity.
 }
 
 type mockWALogRepo struct {
-	created []*entity.HealthLog
-	err     error
+	created     []*entity.HealthLog
+	err         error
+	loggedToday bool
 }
 
 func (m *mockWALogRepo) Create(_ *gorm.DB, log *entity.HealthLog) error {
@@ -41,14 +42,18 @@ func (m *mockWALogRepo) Create(_ *gorm.DB, log *entity.HealthLog) error {
 	m.created = append(m.created, log)
 	return nil
 }
+func (m *mockWALogRepo) HasLogToday(_ *gorm.DB, _ string) (bool, error) {
+	return m.loggedToday, nil
+}
 
 type mockWAReplySender struct {
 	confirmationCalls  int
 	batchCalls         int
 	batchItems         []string
-	templateCalls      int
-	parseErrorCalls    int
-	notRegisteredCalls int
+	templateCalls       int
+	templateLoggedToday bool
+	parseErrorCalls     int
+	notRegisteredCalls  int
 }
 
 func (m *mockWAReplySender) SendHealthLogConfirmation(_ context.Context, _, _, _, _ string) error {
@@ -60,8 +65,9 @@ func (m *mockWAReplySender) SendHealthLogBatchConfirmation(_ context.Context, _,
 	m.batchItems = items
 	return nil
 }
-func (m *mockWAReplySender) SendLogTemplate(_ context.Context, _, _ string) error {
+func (m *mockWAReplySender) SendLogTemplate(_ context.Context, _, _ string, alreadyLoggedToday bool) error {
 	m.templateCalls++
+	m.templateLoggedToday = alreadyLoggedToday
 	return nil
 }
 func (m *mockWAReplySender) SendHealthLogParseError(_ context.Context, _ string) error {
@@ -269,6 +275,30 @@ func TestWAHealthLog_TemplateRequest(t *testing.T) {
 	}
 	if wa.confirmationCalls != 0 || wa.parseErrorCalls != 0 {
 		t.Errorf("template request should not confirm/parse-error")
+	}
+	if wa.templateLoggedToday {
+		t.Errorf("alreadyLoggedToday = true; want false (belum ada log hari ini)")
+	}
+}
+
+func TestWAHealthLog_TemplateRequest_AlreadyLoggedToday(t *testing.T) {
+	pr := &mockWAPatientRepo{byPhone: testPatient}
+	lr := &mockWALogRepo{loggedToday: true}
+	wa := &mockWAReplySender{}
+	uc := newWAHealthLogUC(pr, lr, wa)
+
+	if err := uc.HandleInbound(context.Background(), "628111222333", "saya ingin isi log harian"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wa.templateCalls != 1 {
+		t.Fatalf("templateCalls = %d; want 1", wa.templateCalls)
+	}
+	if !wa.templateLoggedToday {
+		t.Errorf("alreadyLoggedToday = false; want true (sudah ada log hari ini)")
+	}
+	// Tetap kirim template — opsi 2 tidak memblokir input.
+	if len(lr.created) != 0 {
+		t.Errorf("template request must not create logs, got %d", len(lr.created))
 	}
 }
 
