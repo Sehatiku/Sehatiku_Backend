@@ -330,3 +330,18 @@ func (g *WhatsAppGateway) SendHealthLogNotRegistered(ctx context.Context, toPhon
 	return nil
 }
 
+// SendHealthLogNakesNotice mengirim notifikasi bahwa nomor pengirim terdaftar sebagai
+// nakes (dokter/kader/admin), bukan pasien/pendamping — kanal WA khusus pencatatan
+// data kesehatan harian pasien, nakes memakai dashboard web.
+func (g *WhatsAppGateway) SendHealthLogNakesNotice(ctx context.Context, toPhone string) error {
+	text := "ℹ️ *Sehatiku*\n\n" +
+		"Nomor ini terdaftar sebagai nakes (dokter/kader/admin).\n\n" +
+		"Kanal WhatsApp ini khusus untuk pencatatan data kesehatan harian pasien. " +
+		"Silakan gunakan dashboard web Sehatiku untuk memantau pasien Anda 💻"
+	if err := g.sendText(ctx, toPhone, text); err != nil {
+		return fmt.Errorf("sending nakes notice to %s: %w", toPhone, err)
+	}
+	g.Log.Info("wa nakes notice sent", zap.String("to", toPhone))
+	return nil
+}
+

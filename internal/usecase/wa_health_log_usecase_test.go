@@ -29,6 +29,15 @@ func (m *mockWAPatientRepo) FindByCompanionPhone(_ *gorm.DB, _ string) (*entity.
 	return m.byCompanionPhone, m.byCompanionErr
 }
 
+type mockWANakesRepo struct {
+	byPhone    *entity.Nakes
+	byPhoneErr error
+}
+
+func (m *mockWANakesRepo) FindByPhone(_ *gorm.DB, _ string) (*entity.Nakes, error) {
+	return m.byPhone, m.byPhoneErr
+}
+
 type mockWALogRepo struct {
 	created     []*entity.HealthLog
 	err         error
@@ -54,6 +63,7 @@ type mockWAReplySender struct {
 	templateLoggedToday bool
 	parseErrorCalls     int
 	notRegisteredCalls  int
+	nakesNoticeCalls    int
 }
 
 func (m *mockWAReplySender) SendHealthLogConfirmation(_ context.Context, _, _, _, _ string) error {
@@ -78,6 +88,10 @@ func (m *mockWAReplySender) SendHealthLogNotRegistered(_ context.Context, _ stri
 	m.notRegisteredCalls++
 	return nil
 }
+func (m *mockWAReplySender) SendHealthLogNakesNotice(_ context.Context, _ string) error {
+	m.nakesNoticeCalls++
+	return nil
+}
 
 var testPatient = &entity.Patient{
 	ID:          "patient-uuid-1",
@@ -95,6 +109,12 @@ func newWAHealthLogUC(pr *mockWAPatientRepo, lr *mockWALogRepo, wa *mockWAReplyS
 		WhatsApp:    wa,
 		Log:         zap.NewNop(),
 	}
+}
+
+func newWAHealthLogUCWithNakes(pr *mockWAPatientRepo, nr *mockWANakesRepo, lr *mockWALogRepo, wa *mockWAReplySender) *WAHealthLogUseCase {
+	uc := newWAHealthLogUC(pr, lr, wa)
+	uc.NakesRepo = nr
+	return uc
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -179,6 +199,31 @@ func TestWAHealthLog_NotRegistered(t *testing.T) {
 	}
 	if wa.notRegisteredCalls != 1 {
 		t.Errorf("notRegisteredCalls = %d; want 1", wa.notRegisteredCalls)
+	}
+}
+
+func TestWAHealthLog_NakesPhone_NoNotRegisteredReply(t *testing.T) {
+	pr := &mockWAPatientRepo{
+		byPhoneErr:     gorm.ErrRecordNotFound,
+		byCompanionErr: gorm.ErrRecordNotFound,
+	}
+	nr := &mockWANakesRepo{byPhone: &entity.Nakes{ID: "nakes-uuid-1", Status: entity.NakesStatusActive}}
+	lr := &mockWALogRepo{}
+	wa := &mockWAReplySender{}
+	uc := newWAHealthLogUCWithNakes(pr, nr, lr, wa)
+
+	err := uc.HandleInbound(context.Background(), "628555000111", "gula 180")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(lr.created) != 0 {
+		t.Errorf("expected no log created, got %d", len(lr.created))
+	}
+	if wa.notRegisteredCalls != 0 {
+		t.Errorf("notRegisteredCalls = %d; want 0 (nakes should not get 'not registered')", wa.notRegisteredCalls)
+	}
+	if wa.nakesNoticeCalls != 1 {
+		t.Errorf("nakesNoticeCalls = %d; want 1", wa.nakesNoticeCalls)
 	}
 }
 

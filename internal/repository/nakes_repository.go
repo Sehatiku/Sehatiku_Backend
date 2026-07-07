@@ -48,6 +48,18 @@ func (r *NakesRepository) FindByIDs(db *gorm.DB, ids []string) ([]entity.Nakes, 
 	return list, nil
 }
 
+// FindByPhone mencari nakes berdasarkan phone_number yang sudah ternormalisasi
+// (format internasional, mis. "62812..."). Dipakai saat cek nomor pengirim WA
+// inbound agar nakes tidak mendapat balasan "belum terdaftar" yang seharusnya
+// hanya untuk pasien/pendamping.
+func (r *NakesRepository) FindByPhone(db *gorm.DB, phone string) (*entity.Nakes, error) {
+	var nakes entity.Nakes
+	if err := db.Where("phone_number = ? AND status = 'active'", phone).First(&nakes).Error; err != nil {
+		return nil, fmt.Errorf("finding nakes by phone: %w", err)
+	}
+	return &nakes, nil
+}
+
 func (r *NakesRepository) FindByFaskesID(db *gorm.DB, faskesID string) ([]entity.Nakes, error) {
 	var list []entity.Nakes
 	if err := db.Where("faskes_id = ?", faskesID).Order("enrolled_at DESC").Find(&list).Error; err != nil {

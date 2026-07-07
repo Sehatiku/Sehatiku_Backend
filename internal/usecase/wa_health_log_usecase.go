@@ -21,6 +21,13 @@ type waPatientRepo interface {
 	FindByCompanionPhone(db *gorm.DB, phone string) (*entity.Patient, error)
 }
 
+// waNakesRepo adalah interface minimal untuk cek apakah nomor pengirim WA terdaftar
+// sebagai nakes — agar nakes tidak mendapat balasan "belum terdaftar" yang seharusnya
+// hanya berlaku untuk pasien/pendamping.
+type waNakesRepo interface {
+	FindByPhone(db *gorm.DB, phone string) (*entity.Nakes, error)
+}
+
 // waHealthLogRepo adalah interface minimal yang dibutuhkan — hanya Create.
 // Sama dengan healthLogRepository yang dipakai HealthLogUseCase, tapi tidak
 // meng-inherit interface itu untuk menghindari dependensi silang antar file.
@@ -37,6 +44,7 @@ type waReplySender interface {
 	SendLogTemplate(ctx context.Context, toPhone, patientName string, alreadyLoggedToday bool) error
 	SendHealthLogParseError(ctx context.Context, toPhone string) error
 	SendHealthLogNotRegistered(ctx context.Context, toPhone string) error
+	SendHealthLogNakesNotice(ctx context.Context, toPhone string) error
 }
 
 // WAHealthLogUseCase menangani pesan WA inbound dari pasien/pendamping yang bermaksud
@@ -53,6 +61,7 @@ type waReplySender interface {
 type WAHealthLogUseCase struct {
 	DB          *gorm.DB
 	PatientRepo waPatientRepo
+	NakesRepo   waNakesRepo // cek nomor nakes sebelum membalas "belum terdaftar"
 	LogRepo     waHealthLogRepo
 	Extractor   foodExtractor // opsional — NER makanan; pakai interface dari health_log_usecase.go
 	WhatsApp    waReplySender
@@ -70,7 +79,17 @@ func (u *WAHealthLogUseCase) HandleInbound(ctx context.Context, senderPhone, mes
 		return fmt.Errorf("wa health log lookup for %s: %w", helper.MaskPhone(senderPhone), err)
 	}
 	if patient == nil {
-		// Nomor tidak terdaftar — balas WA, bukan error
+		// Bukan pasien/pendamping — cek apakah nomor ini nakes sebelum menyimpulkan
+		// "tidak terdaftar" (nakes memang tidak punya akun pasien, tapi tetap terdaftar
+		// di sistem lewat dashboard web).
+		isNakes, err := u.isNakesPhone(senderPhone)
+		if err != nil {
+			return fmt.Errorf("wa health log nakes lookup for %s: %w", helper.MaskPhone(senderPhone), err)
+		}
+		if isNakes {
+			u.replyNakesNotice(ctx, senderPhone)
+			return nil
+		}
 		u.replyNotRegistered(ctx, senderPhone)
 		return nil
 	}
@@ -192,6 +211,22 @@ func (u *WAHealthLogUseCase) lookupPatient(ctx context.Context, phone string) (*
 
 	// Tidak ditemukan sama sekali
 	return nil, "", nil
+}
+
+// isNakesPhone mengecek apakah nomor pengirim terdaftar sebagai nakes aktif.
+// NakesRepo opsional (nil bila tidak di-wire, mis. test lama) — anggap bukan nakes.
+func (u *WAHealthLogUseCase) isNakesPhone(phone string) (bool, error) {
+	if u.NakesRepo == nil {
+		return false, nil
+	}
+	_, err := u.NakesRepo.FindByPhone(u.DB, phone)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return false, fmt.Errorf("finding nakes by phone: %w", err)
 }
 
 // buildLog memetakan ParsedMetric ke entity.HealthLog, sekaligus memvalidasi range nilai
@@ -377,6 +412,16 @@ func (u *WAHealthLogUseCase) replyNotRegistered(ctx context.Context, toPhone str
 	}
 	if err := u.WhatsApp.SendHealthLogNotRegistered(ctx, toPhone); err != nil {
 		u.Log.Warn("gagal kirim notif tidak terdaftar WA",
+			zap.String("phone", helper.MaskPhone(toPhone)), zap.Error(err))
+	}
+}
+
+func (u *WAHealthLogUseCase) replyNakesNotice(ctx context.Context, toPhone string) {
+	if u.WhatsApp == nil {
+		return
+	}
+	if err := u.WhatsApp.SendHealthLogNakesNotice(ctx, toPhone); err != nil {
+		u.Log.Warn("gagal kirim notif nakes WA",
 			zap.String("phone", helper.MaskPhone(toPhone)), zap.Error(err))
 	}
 }
