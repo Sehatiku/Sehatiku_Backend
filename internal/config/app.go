@@ -186,6 +186,7 @@ func BootStrap(config *BootStrapConfig) {
 	waHealthLogUC := &usecase.WAHealthLogUseCase{
 		DB:          config.DB,
 		PatientRepo: patientRepo,
+		NakesRepo:   nakesRepo,
 		LogRepo:     healthLogRepo,
 		Extractor:   mlGateway, // enrichment makanan via NER+TKPI (opsional)
 		WhatsApp:    config.WhatsApp,
