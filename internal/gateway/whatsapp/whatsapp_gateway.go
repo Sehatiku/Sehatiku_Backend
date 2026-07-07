@@ -237,7 +237,7 @@ func (g *WhatsAppGateway) SendHealthLogBatchConfirmation(ctx context.Context, to
 		b.WriteString(it)
 		b.WriteString("\n")
 	}
-	b.WriteString("\nTerima kasih sudah rutin mencatat ya 💙")
+	fmt.Fprintf(&b, "\n🙏 *Terima kasih, %s!* Log harian Anda sudah lengkap kami terima.\nTerus jaga kesehatan ya 💙", patientName)
 	if err := g.sendText(ctx, toPhone, b.String()); err != nil {
 		return fmt.Errorf("sending batch health log confirmation to %s: %w", toPhone, err)
 	}
@@ -256,11 +256,24 @@ func (g *WhatsAppGateway) SendLogTemplate(ctx context.Context, toPhone, patientN
 			"Salin pesan di bawah, isi nilainya, lalu kirim balik. Kosongkan yang tidak ada.\n\n"+
 			"Gula: \n"+
 			"Tensi: \n"+
+			"Makan: \n"+
+			"Stres: \n"+
 			"Obat: \n"+
 			"Olahraga: \n"+
 			"Tidur: \n"+
 			"Berat: \n\n"+
-			"Cara isi: gula, olahraga, tidur, dan berat tulis angka; tensi tulis sistolik garis miring diastolik; obat tulis ya atau tidak 🙏",
+			"Cara isi: gula, olahraga, tidur, dan berat tulis angka; stres tulis angka 1-10; "+
+			"tensi tulis sistolik garis miring diastolik; obat tulis ya atau tidak; makan tulis nama menunya 🙏\n\n"+
+			"─────────────\n"+
+			"*Contoh yang sudah diisi:*\n\n"+
+			"Gula: 180\n"+
+			"Tensi: 120/80\n"+
+			"Makan: nasi goreng 1 piring\n"+
+			"Stres: 4\n"+
+			"Obat: ya\n"+
+			"Olahraga: 30\n"+
+			"Tidur: 7\n"+
+			"Berat: 65",
 		patientName,
 	)
 	if err := g.sendText(ctx, toPhone, text); err != nil {

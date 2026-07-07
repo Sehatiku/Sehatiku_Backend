@@ -127,9 +127,13 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 		FullName:        req.FullName,
 		NIK:             req.NIK,
 		Alamat:          req.Alamat,
-		PhoneNumber:     req.PhoneNumber,
+		// Normalisasi ke format internasional telanjang (62...) agar cocok dengan nomor
+		// pengirim WA (jid.User) saat pasien/pendamping mencatat log via WhatsApp, dan
+		// saat warm-up credential dikirim. Tanpa ini, "0812.."/"+62 812.." di DB tak
+		// pernah match "62812.." dari WA. Lihat helper.NormalizePhoneID.
+		PhoneNumber:     helper.NormalizePhoneID(req.PhoneNumber),
 		CompanionName:   req.CompanionName,
-		CompanionPhone:  req.CompanionPhone,
+		CompanionPhone:  helper.NormalizePhoneID(req.CompanionPhone),
 		DateOfBirth:     &dob,
 		Sex:             req.Sex,
 		DiseaseType:     req.DiseaseType,

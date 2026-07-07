@@ -152,13 +152,15 @@ func TestRegisterPatient_StashesWarmupAndReturnsCredentials(t *testing.T) {
 	if len(stasher.stashed) != 2 {
 		t.Fatalf("stashed %d entries; want 2 (patient + companion)", len(stasher.stashed))
 	}
-	if got := stasher.stashed["081111111111"].Role; got != entity.RecipientRolePatient {
+	// Stash di-key oleh nomor ternormalisasi (62...) — sama dengan nomor pengirim WA
+	// (jid.User) saat warm-up credential dikirim balik. Lihat helper.NormalizePhoneID.
+	if got := stasher.stashed["6281111111111"].Role; got != entity.RecipientRolePatient {
 		t.Errorf("patient stash role = %q; want patient", got)
 	}
-	if got := stasher.stashed["082222222222"].Role; got != entity.RecipientRoleCompanion {
+	if got := stasher.stashed["6282222222222"].Role; got != entity.RecipientRoleCompanion {
 		t.Errorf("companion stash role = %q; want companion", got)
 	}
-	if stasher.stashed["082222222222"].PatientName != "Budi" {
+	if stasher.stashed["6282222222222"].PatientName != "Budi" {
 		t.Errorf("companion stash missing patient name")
 	}
 

@@ -278,12 +278,22 @@ func TestWAHealthLog_MultiMetricForm(t *testing.T) {
 	wa := &mockWAReplySender{}
 	uc := newWAHealthLogUC(pr, lr, wa)
 
-	msg := "Gula: 180\nTensi: 120/80\nObat: tidak\nBerat: 65"
+	msg := "Gula: 180\nTensi: 120/80\nMakan: nasi goreng\nStres: 4\nObat: tidak\nBerat: 65"
 	if err := uc.HandleInbound(context.Background(), "628111222333", msg); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(lr.created) != 4 {
-		t.Fatalf("expected 4 logs, got %d", len(lr.created))
+	if len(lr.created) != 6 {
+		t.Fatalf("expected 6 logs, got %d", len(lr.created))
+	}
+	// Fitur AI kritis harus ikut tercatat: food (carbs/sodium) & stress.
+	got := map[string]bool{}
+	for _, l := range lr.created {
+		got[l.MetricType] = true
+	}
+	for _, want := range []string{"glucose", "bp", "food", "stress", "med_adherence", "weight"} {
+		if !got[want] {
+			t.Errorf("metric %s tidak tercatat dari form", want)
+		}
 	}
 	if wa.batchCalls != 1 {
 		t.Errorf("batchCalls = %d; want 1", wa.batchCalls)
