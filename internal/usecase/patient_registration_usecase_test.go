@@ -62,9 +62,10 @@ func (m *mockStasher) Stash(_ context.Context, phone string, data repository.Pen
 	return nil
 }
 
-type mockBaselineRepo struct{}
+type mockBaselineRepo struct{ created *entity.PatientClinicalBaseline }
 
-func (m *mockBaselineRepo) Create(_ *gorm.DB, _ *entity.PatientClinicalBaseline) error {
+func (m *mockBaselineRepo) Create(_ *gorm.DB, b *entity.PatientClinicalBaseline) error {
+	m.created = b
 	return nil
 }
 
@@ -105,12 +106,8 @@ func validPatientReq() *model.PatientRegisterRequest {
 		Username:        "budi",
 		Password:        "secret12",
 		Baseline: model.PatientBaselineRequest{
-			AgeYears:              64,
-			Sex:                   "male",
 			BMI:                   24.5,
-			BMICategory:           "normal",
 			WaistCircumferenceCm:  88.0,
-			CentralObesity:        boolPtr(false),
 			SmokingStatus:         "never",
 			AlcoholUse:            boolPtr(false),
 			PhysicalActivity:      "light",
@@ -118,10 +115,8 @@ func validPatientReq() *model.PatientRegisterRequest {
 			FamilyHistoryCVD:      boolPtr(false),
 			SystolicBPMmhg:        130,
 			DiastolicBPMmhg:       85,
-			HypertensionStatus:    "stage1",
 			FastingGlucoseMgdl:    110.0,
 			HbA1cPct:              6.2,
-			DiabetesStatus:        "prediabetes",
 			TotalCholesterolMgdl:  195.0,
 			HDLMgdl:               48.0,
 			LDLMgdl:               120.0,
@@ -131,7 +126,7 @@ func validPatientReq() *model.PatientRegisterRequest {
 			OnAntihypertensive:    boolPtr(false),
 			OnAntidiabetic:        boolPtr(false),
 			OnStatin:              boolPtr(false),
-			TargetRisk:            "moderate",
+			TargetRisk:            "medium",
 			EGFR:                  78.0,
 			UACR:                  12.5,
 		},
@@ -189,6 +184,52 @@ func TestRegisterPatient_StashesWarmupAndReturnsCredentials(t *testing.T) {
 	// Dua baris audit notifikasi tercatat.
 	if notif.created != 2 {
 		t.Errorf("notifications created = %d; want 2", notif.created)
+	}
+}
+
+func TestRegisterPatient_DerivesBaselineFieldsServerSide(t *testing.T) {
+	blRepo := &mockBaselineRepo{}
+	uc := newPatientRegUC(&mockStasher{}, &mockRegNotifRepo{})
+	uc.BaselineRepo = blRepo
+
+	if _, err := uc.RegisterPatient(context.Background(), "faskes-1", validPatientReq()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	b := blRepo.created
+	if b == nil {
+		t.Fatal("baseline was not created")
+	}
+	// Kategori turunan dihitung backend dari nilai mentah — bukan diinput faskes.
+	if b.BMICategory != "overweight" { // BMI 24.5 → WHO Asia-Pasifik overweight
+		t.Errorf("bmi_category = %q; want overweight", b.BMICategory)
+	}
+	if b.CentralObesity { // pinggang 88, pria < 90 → false
+		t.Errorf("central_obesity = true; want false")
+	}
+	if b.HypertensionStatus != "stage_1" { // 130/85
+		t.Errorf("hypertension_status = %q; want stage_1", b.HypertensionStatus)
+	}
+	if b.DiabetesStatus != "prediabetes" { // HbA1c 6.2
+		t.Errorf("diabetes_status = %q; want prediabetes", b.DiabetesStatus)
+	}
+	// age_years & sex diambil dari record pasien, bukan payload baseline.
+	if b.Sex != "male" {
+		t.Errorf("sex = %q; want male (dari patient)", b.Sex)
+	}
+	if b.AgeYears <= 0 {
+		t.Errorf("age_years = %d; want > 0 (dari DOB)", b.AgeYears)
+	}
+	// Diagnosis default dari disease_type diabetes_t2 → cluster 1 / "Diabetes".
+	if b.ClusterID == nil || *b.ClusterID != 1 {
+		t.Errorf("cluster_id = %v; want 1", b.ClusterID)
+	}
+	if b.DiagnosisCluster == nil || *b.DiagnosisCluster != "Diabetes" {
+		t.Errorf("diagnosis_cluster = %v; want Diabetes", b.DiagnosisCluster)
+	}
+	// clinical_group disamakan dengan target_risk.
+	if b.ClinicalGroup == nil || *b.ClinicalGroup != "medium" {
+		t.Errorf("clinical_group = %v; want medium (= target_risk)", b.ClinicalGroup)
 	}
 }
 

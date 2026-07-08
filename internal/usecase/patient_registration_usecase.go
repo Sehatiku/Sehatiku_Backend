@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
+	"net/http"
 	"sehatiku-backend/internal/entity"
+	"sehatiku-backend/internal/gateway/gemini"
 	"sehatiku-backend/internal/gateway/ocr"
 	"sehatiku-backend/internal/gateway/whatsapp"
 	"sehatiku-backend/internal/helper"
@@ -43,6 +46,7 @@ type PatientRegistrationUseCase struct {
 	PendingCredential pendingCredentialStasher
 	BaselineRepo      baselineRepo
 	OCRGateway        *ocr.KTPOCRGateway
+	Gemini            *gemini.GeminiGateway
 	WhatsApp          *whatsapp.WhatsAppGateway
 	Log               *zap.Logger
 }
@@ -76,6 +80,20 @@ func (u *PatientRegistrationUseCase) ScanKTP(ctx context.Context, file multipart
 		return nil, err
 	}
 	return convertOCRResult(result), nil
+}
+
+// ScanBaseline membaca dokumen template baseline Sehatiku yang sudah diisi faskes (gambar/PDF)
+// via Gemini vision dan mengembalikan objek baseline untuk mem-prefill form registrasi. Ini
+// HANYA prefill — faskes tetap meninjau/mengoreksi sebelum submit ke endpoint register.
+func (u *PatientRegistrationUseCase) ScanBaseline(ctx context.Context, file multipart.File, filename string) (*model.PatientBaselineRequest, error) {
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("reading upload: %w", err)
+	}
+	// Deteksi MIME asli dari isi file (bukan ekstensi) agar part inline_data ke Gemini
+	// bertipe benar (image/jpeg, image/png, application/pdf).
+	mimeType := http.DetectContentType(fileBytes)
+	return u.Gemini.ExtractBaseline(ctx, fileBytes, mimeType)
 }
 
 func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskesID string, req *model.PatientRegisterRequest) (*model.PatientRegisterResponse, error) {
@@ -169,7 +187,7 @@ func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskes
 	// Create clinical baseline. Non-fatal: patient is already persisted; a baseline
 	// failure does not roll back registration. Faskes can re-submit baseline separately
 	// if needed.
-	baseline := buildBaseline(patient.ID, req.Baseline)
+	baseline := buildBaseline(patient, req.Baseline)
 	if err := u.BaselineRepo.Create(u.DB, baseline); err != nil {
 		u.Log.Warn("failed to create clinical baseline",
 			zap.String("patient_id", patient.ID), zap.Error(err))
@@ -265,16 +283,24 @@ func (u *PatientRegistrationUseCase) prepareWarmup(
 	return helper.BuildWAMeLink(botPhone, waWarmupPrefillText)
 }
 
-func buildBaseline(patientID string, b model.PatientBaselineRequest) *entity.PatientClinicalBaseline {
-	return &entity.PatientClinicalBaseline{
-		PatientID:             patientID,
-		RecordedAt:            time.Now(),
-		AgeYears:              b.AgeYears,
-		Sex:                   b.Sex,
+// buildBaseline merakit satu baris baseline dari input mentah faskes. Field kategori/turunan
+// dihitung server-side (baseline_derivation.go); age_years/sex diambil dari record pasien;
+// clinical_group disamakan dengan target_risk; Diagnosis tunggal dipetakan ke cluster_id +
+// diagnosis_cluster (default dari disease_type pasien). RecordedAt bisa ditimpa oleh caller.
+func buildBaseline(patient *entity.Patient, b model.PatientBaselineRequest) *entity.PatientClinicalBaseline {
+	now := time.Now()
+	clusterID, diagnosisCluster := deriveDiagnosis(patient.DiseaseType, b.Diagnosis)
+	clinicalGroup := b.TargetRisk
+
+	bl := &entity.PatientClinicalBaseline{
+		PatientID:             patient.ID,
+		RecordedAt:            now,
+		AgeYears:              scoringAgeFromDOB(patient.DateOfBirth, now),
+		Sex:                   patient.Sex,
 		BMI:                   b.BMI,
-		BMICategory:           b.BMICategory,
+		BMICategory:           deriveBMICategory(b.BMI),
 		WaistCircumferenceCm:  b.WaistCircumferenceCm,
-		CentralObesity:        derefBool(b.CentralObesity),
+		CentralObesity:        deriveCentralObesity(b.WaistCircumferenceCm, patient.Sex),
 		SmokingStatus:         b.SmokingStatus,
 		AlcoholUse:            derefBool(b.AlcoholUse),
 		PhysicalActivity:      b.PhysicalActivity,
@@ -282,10 +308,10 @@ func buildBaseline(patientID string, b model.PatientBaselineRequest) *entity.Pat
 		FamilyHistoryCVD:      derefBool(b.FamilyHistoryCVD),
 		SystolicBPMmhg:        b.SystolicBPMmhg,
 		DiastolicBPMmhg:       b.DiastolicBPMmhg,
-		HypertensionStatus:    b.HypertensionStatus,
+		HypertensionStatus:    deriveHypertensionStatus(b.SystolicBPMmhg, b.DiastolicBPMmhg),
 		FastingGlucoseMgdl:    b.FastingGlucoseMgdl,
 		HbA1cPct:              b.HbA1cPct,
-		DiabetesStatus:        b.DiabetesStatus,
+		DiabetesStatus:        deriveDiabetesStatus(b.HbA1cPct, b.FastingGlucoseMgdl),
 		TotalCholesterolMgdl:  b.TotalCholesterolMgdl,
 		HDLMgdl:               b.HDLMgdl,
 		LDLMgdl:               b.LDLMgdl,
@@ -298,10 +324,13 @@ func buildBaseline(patientID string, b model.PatientBaselineRequest) *entity.Pat
 		TargetRisk:            b.TargetRisk,
 		EGFR:                  b.EGFR,
 		UACR:                  b.UACR,
-		ClusterID:             b.ClusterID,
-		DiagnosisCluster:      b.DiagnosisCluster,
-		ClinicalGroup:         b.ClinicalGroup,
+		ClinicalGroup:         &clinicalGroup,
 	}
+	if clusterID != 0 {
+		bl.ClusterID = &clusterID
+		bl.DiagnosisCluster = &diagnosisCluster
+	}
+	return bl
 }
 
 func derefBool(p *bool) bool {
