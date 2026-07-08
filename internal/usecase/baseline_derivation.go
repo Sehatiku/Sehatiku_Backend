@@ -77,3 +77,19 @@ func deriveDiagnosis(diseaseType string, override *string) (int, string) {
 		return 0, ""
 	}
 }
+
+// deriveDiseaseType memetakan dropdown Diagnosis hasil OCR baseline (diabetes/hipertensi/
+// komplikasi) ke enum disease_type form registrasi (diabetes_t2/hypertension/both), supaya
+// scan baseline juga bisa mem-prefill disease_type. "" bila diagnosis kosong/tak dikenali.
+func deriveDiseaseType(diagnosis string) string {
+	switch diagnosis {
+	case "diabetes":
+		return "diabetes_t2"
+	case "hipertensi":
+		return "hypertension"
+	case "komplikasi":
+		return "both"
+	default:
+		return ""
+	}
+}

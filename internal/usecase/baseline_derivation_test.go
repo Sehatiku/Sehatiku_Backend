@@ -105,3 +105,18 @@ func TestDeriveDiagnosis(t *testing.T) {
 		}
 	}
 }
+
+func TestDeriveDiseaseType(t *testing.T) {
+	cases := []struct{ diagnosis, want string }{
+		{"diabetes", "diabetes_t2"},
+		{"hipertensi", "hypertension"},
+		{"komplikasi", "both"},
+		{"", ""},
+		{"unknown", ""},
+	}
+	for _, c := range cases {
+		if got := deriveDiseaseType(c.diagnosis); got != c.want {
+			t.Errorf("deriveDiseaseType(%q) = %q; want %q", c.diagnosis, got, c.want)
+		}
+	}
+}

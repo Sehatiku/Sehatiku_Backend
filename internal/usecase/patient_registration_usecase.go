@@ -85,7 +85,7 @@ func (u *PatientRegistrationUseCase) ScanKTP(ctx context.Context, file multipart
 // ScanBaseline membaca dokumen template baseline Sehatiku yang sudah diisi faskes (gambar/PDF)
 // via Gemini vision dan mengembalikan objek baseline untuk mem-prefill form registrasi. Ini
 // HANYA prefill — faskes tetap meninjau/mengoreksi sebelum submit ke endpoint register.
-func (u *PatientRegistrationUseCase) ScanBaseline(ctx context.Context, file multipart.File, filename string) (*model.PatientBaselineRequest, error) {
+func (u *PatientRegistrationUseCase) ScanBaseline(ctx context.Context, file multipart.File, filename string) (*model.BaselineOCRResponse, error) {
 	fileBytes, err := io.ReadAll(file)
 	if err != nil {
 		return nil, fmt.Errorf("reading upload: %w", err)
@@ -93,7 +93,18 @@ func (u *PatientRegistrationUseCase) ScanBaseline(ctx context.Context, file mult
 	// Deteksi MIME asli dari isi file (bukan ekstensi) agar part inline_data ke Gemini
 	// bertipe benar (image/jpeg, image/png, application/pdf).
 	mimeType := http.DetectContentType(fileBytes)
-	return u.Gemini.ExtractBaseline(ctx, fileBytes, mimeType)
+	baseline, err := u.Gemini.ExtractBaseline(ctx, fileBytes, mimeType)
+	if err != nil {
+		return nil, err
+	}
+	diagnosis := ""
+	if baseline.Diagnosis != nil {
+		diagnosis = *baseline.Diagnosis
+	}
+	return &model.BaselineOCRResponse{
+		DiseaseType: deriveDiseaseType(diagnosis),
+		Baseline:    baseline,
+	}, nil
 }
 
 func (u *PatientRegistrationUseCase) RegisterPatient(ctx context.Context, faskesID string, req *model.PatientRegisterRequest) (*model.PatientRegisterResponse, error) {
