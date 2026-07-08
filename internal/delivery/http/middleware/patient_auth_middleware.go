@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/helper"
 	"sehatiku-backend/internal/model"
 
@@ -14,7 +15,7 @@ func PatientAuth(jwt *helper.JWTHelper) echo.MiddlewareFunc {
 			raw := extractBearerToken(c)
 			if raw == "" {
 				return c.JSON(http.StatusUnauthorized, model.WebResponse[any]{
-					Message: "unauthorized",
+					Message: constants.MsgUnauthorized,
 					Errors:  "authorization header diperlukan",
 				})
 			}
@@ -22,7 +23,7 @@ func PatientAuth(jwt *helper.JWTHelper) echo.MiddlewareFunc {
 			claims, err := jwt.ValidatePatientToken(raw)
 			if err != nil {
 				return c.JSON(http.StatusUnauthorized, model.WebResponse[any]{
-					Message: "unauthorized",
+					Message: constants.MsgUnauthorized,
 					Errors:  "token tidak valid atau sudah kadaluarsa",
 				})
 			}

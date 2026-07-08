@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/usecase"
 	"strconv"
@@ -40,7 +41,7 @@ func (c *EscalationController) getQueue(ctx *echo.Context, faskesID string) erro
 	items, paging, err := c.UseCase.GetQueue(ctx.Request().Context(), faskesID, status, tier, page, size)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}
@@ -92,7 +93,7 @@ func (c *EscalationController) transition(ctx *echo.Context, action, faskesID st
 		if errors.Is(err, usecase.ErrEscalationClosed) {
 			return ctx.JSON(http.StatusConflict, model.WebResponse[any]{Message: "eskalasi sudah ditutup", Errors: err.Error()})
 		}
-		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: constants.MsgInternalServerError, Errors: err.Error()})
 	}
 	return ctx.JSON(http.StatusOK, model.WebResponse[any]{Message: "status eskalasi berhasil diperbarui", Data: nil})
 }
@@ -106,10 +107,10 @@ func (c *EscalationController) SetFeedback(ctx *echo.Context) error {
 
 	req := new(model.SetEscalationFeedbackRequest)
 	if err := ctx.Bind(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "bad request", Errors: err.Error()})
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: constants.MsgBadRequest, Errors: err.Error()})
 	}
 	if err := ctx.Validate(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "validation error", Errors: err.Error()})
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: constants.MsgValidationError, Errors: err.Error()})
 	}
 
 	if err := c.UseCase.SetFeedback(ctx.Request().Context(), id, claims.FaskesID, claims.NakesID, req.Feedback); err != nil {
@@ -119,7 +120,7 @@ func (c *EscalationController) SetFeedback(ctx *echo.Context) error {
 		if errors.Is(err, usecase.ErrInvalidFeedback) {
 			return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "feedback tidak valid", Errors: err.Error()})
 		}
-		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: constants.MsgInternalServerError, Errors: err.Error()})
 	}
 	return ctx.JSON(http.StatusOK, model.WebResponse[any]{Message: "feedback eskalasi berhasil disimpan", Data: nil})
 }

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/helper"
 	"sehatiku-backend/internal/model"
 
@@ -17,7 +18,7 @@ func AnyAuth(jwtHelper *helper.JWTHelper) echo.MiddlewareFunc {
 			raw := extractBearerToken(c)
 			if raw == "" {
 				return c.JSON(http.StatusUnauthorized, model.WebResponse[any]{
-					Message: "unauthorized",
+					Message: constants.MsgUnauthorized,
 					Errors:  "authorization header diperlukan",
 				})
 			}
@@ -25,7 +26,7 @@ func AnyAuth(jwtHelper *helper.JWTHelper) echo.MiddlewareFunc {
 			typ, err := extractTypClaim(raw)
 			if err != nil {
 				return c.JSON(http.StatusUnauthorized, model.WebResponse[any]{
-					Message: "unauthorized",
+					Message: constants.MsgUnauthorized,
 					Errors:  "token tidak valid",
 				})
 			}
@@ -61,7 +62,7 @@ func AnyAuth(jwtHelper *helper.JWTHelper) echo.MiddlewareFunc {
 			}
 
 			return c.JSON(http.StatusUnauthorized, model.WebResponse[any]{
-				Message: "unauthorized",
+				Message: constants.MsgUnauthorized,
 				Errors:  "token tidak valid atau sudah kadaluarsa",
 			})
 		}

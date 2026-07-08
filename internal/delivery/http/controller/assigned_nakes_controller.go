@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/usecase"
 
@@ -25,12 +26,12 @@ func (c *AssignedNakesController) GetAssignedNakes(ctx *echo.Context) error {
 	if err != nil {
 		if errors.Is(err, usecase.ErrAssignedNakesNotFound) {
 			return ctx.JSON(http.StatusNotFound, model.WebResponse[any]{
-				Message: "not found",
+				Message: constants.MsgNotFound,
 				Errors:  err.Error(),
 			})
 		}
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}

@@ -121,7 +121,6 @@ func (u *SummaryUseCase) buildSummary(ctx context.Context, audience, patientID s
 		return cached, nil
 	}
 
-	// --- Agregasi window ---
 	since := today.AddDate(0, 0, -(window - 1)) // window hari, termasuk hari ini (WIB)
 
 	raw, err := u.Repo.GetWindowAggregates(u.DB, patientID, since)

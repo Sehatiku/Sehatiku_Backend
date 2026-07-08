@@ -27,9 +27,6 @@ var (
 )
 
 const (
-	healthLogLoggedBy = "patient" // pasien input sendiri lewat app; pendamping pakai WhatsApp
-	healthLogSource   = "web"     // Patient App native (satu-satunya opsi non-WA/SMS di enum log_source)
-
 	// measuredAtSkew memberi toleransi clock skew sebelum menolak timestamp masa depan.
 	measuredAtSkew = 5 * time.Minute
 
@@ -72,9 +69,9 @@ func (u *HealthLogUseCase) CreateHealthLog(ctx context.Context, patientID, idemp
 
 	log := &entity.HealthLog{
 		PatientID:  patientID,
-		LoggedBy:   healthLogLoggedBy,
+		LoggedBy:   entity.LoggedByPatient,
 		MetricType: req.MetricType,
-		Source:     healthLogSource,
+		Source:     entity.LogSourceWeb,
 	}
 	if err := applyMetricValue(req, log); err != nil {
 		return nil, err

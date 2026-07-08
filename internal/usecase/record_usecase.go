@@ -18,11 +18,6 @@ import (
 
 var ErrNoMetricProvided = errors.New("minimal satu metrik harus diisi")
 
-const (
-	recordSource   = "app"
-	recordLoggedBy = "patient"
-)
-
 type recordHealthLogRepo interface {
 	Create(db *gorm.DB, log *entity.HealthLog) error
 }
@@ -64,11 +59,11 @@ func (u *RecordUseCase) CreateRecord(ctx context.Context, patientID string, req 
 		}
 		if err := u.LogRepo.Create(u.DB, &entity.HealthLog{
 			PatientID:    patientID,
-			LoggedBy:     recordLoggedBy,
+			LoggedBy:     entity.LoggedByPatient,
 			MetricType:   "glucose",
 			ValueNumeric: req.BloodSugar,
 			MeasuredAt:   recordedAt,
-			Source:       recordSource,
+			Source:       entity.LogSourceApp,
 		}); err != nil {
 			return nil, fmt.Errorf("inserting glucose record: %w", err)
 		}
@@ -93,11 +88,11 @@ func (u *RecordUseCase) CreateRecord(ctx context.Context, patientID string, req 
 		bpJSON := fmt.Sprintf(`{"systolic":%d,"diastolic":%d}`, sys, dia)
 		if err := u.LogRepo.Create(u.DB, &entity.HealthLog{
 			PatientID:  patientID,
-			LoggedBy:   recordLoggedBy,
+			LoggedBy:   entity.LoggedByPatient,
 			MetricType: "bp",
 			ValueJSONB: &bpJSON,
 			MeasuredAt: recordedAt,
-			Source:     recordSource,
+			Source:     entity.LogSourceApp,
 		}); err != nil {
 			return nil, fmt.Errorf("inserting bp record: %w", err)
 		}
@@ -110,11 +105,11 @@ func (u *RecordUseCase) CreateRecord(ctx context.Context, patientID string, req 
 		}
 		if err := u.LogRepo.Create(u.DB, &entity.HealthLog{
 			PatientID:    patientID,
-			LoggedBy:     recordLoggedBy,
+			LoggedBy:     entity.LoggedByPatient,
 			MetricType:   "weight",
 			ValueNumeric: req.Weight,
 			MeasuredAt:   recordedAt,
-			Source:       recordSource,
+			Source:       entity.LogSourceApp,
 		}); err != nil {
 			return nil, fmt.Errorf("inserting weight record: %w", err)
 		}
@@ -128,11 +123,11 @@ func (u *RecordUseCase) CreateRecord(ctx context.Context, patientID string, req 
 		}
 		if err := u.LogRepo.Create(u.DB, &entity.HealthLog{
 			PatientID:    patientID,
-			LoggedBy:     recordLoggedBy,
+			LoggedBy:     entity.LoggedByPatient,
 			MetricType:   "med_adherence",
 			ValueNumeric: &adherence,
 			MeasuredAt:   recordedAt,
-			Source:       recordSource,
+			Source:       entity.LogSourceApp,
 		}); err != nil {
 			return nil, fmt.Errorf("inserting med_adherence record: %w", err)
 		}
@@ -146,11 +141,11 @@ func (u *RecordUseCase) CreateRecord(ctx context.Context, patientID string, req 
 		}
 		foodLog := &entity.HealthLog{
 			PatientID:  patientID,
-			LoggedBy:   recordLoggedBy,
+			LoggedBy:   entity.LoggedByPatient,
 			MetricType: "food",
 			ValueText:  &meals,
 			MeasuredAt: recordedAt,
-			Source:     recordSource,
+			Source:     entity.LogSourceApp,
 		}
 		// Enrich gizi (NER+TKPI) -> value_jsonb supaya makanan ikut dihitung di roll-7.
 		enrichFoodJSONB(ctx, u.Extractor, foodLog, meals, u.Log)

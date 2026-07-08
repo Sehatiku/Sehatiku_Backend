@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 	"strconv"
 
@@ -27,7 +28,7 @@ func (c *BaselineController) GetLatest(ctx *echo.Context) error {
 	patientID := ctx.Param("id")
 	if patientID == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "patient id wajib diisi",
 		})
 	}
@@ -50,7 +51,7 @@ func (c *BaselineController) Create(ctx *echo.Context) error {
 	patientID := ctx.Param("id")
 	if patientID == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "patient id wajib diisi",
 		})
 	}
@@ -58,13 +59,13 @@ func (c *BaselineController) Create(ctx *echo.Context) error {
 	req := new(model.CreateBaselineRequest)
 	if err := ctx.Bind(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  err.Error(),
 		})
 	}
 	if err := ctx.Validate(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "validation error",
+			Message: constants.MsgValidationError,
 			Errors:  err.Error(),
 		})
 	}
@@ -87,7 +88,7 @@ func (c *BaselineController) GetHistory(ctx *echo.Context) error {
 	patientID := ctx.Param("id")
 	if patientID == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "patient id wajib diisi",
 		})
 	}

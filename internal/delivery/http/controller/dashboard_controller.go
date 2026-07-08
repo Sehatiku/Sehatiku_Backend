@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 	"strconv"
 
@@ -28,7 +29,7 @@ func (c *DashboardController) GetSummary(ctx *echo.Context) error {
 	summary, err := c.SummaryUseCase.GetSummary(ctx.Request().Context(), claims.FaskesID)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}
@@ -54,7 +55,7 @@ func (c *DashboardController) GetPatientQueue(ctx *echo.Context) error {
 	items, paging, err := c.QueueUseCase.GetPatientQueue(ctx.Request().Context(), claims.FaskesID, page, size)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}

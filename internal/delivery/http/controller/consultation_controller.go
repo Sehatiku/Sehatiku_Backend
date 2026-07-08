@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 	"strings"
 
@@ -25,15 +26,15 @@ func (c *ConsultationController) Create(ctx *echo.Context) error {
 
 	req := new(model.CreateConsultationRequest)
 	if err := ctx.Bind(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "bad request", Errors: err.Error()})
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: constants.MsgBadRequest, Errors: err.Error()})
 	}
 	if err := ctx.Validate(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "validation error", Errors: err.Error()})
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: constants.MsgValidationError, Errors: err.Error()})
 	}
 
 	data, err := c.UseCase.CreateConsultation(ctx.Request().Context(), claims.PatientID, req)
 	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: constants.MsgInternalServerError, Errors: err.Error()})
 	}
 
 	return ctx.JSON(http.StatusCreated, model.WebResponse[*model.ConsultationResponse]{
@@ -47,7 +48,7 @@ func (c *ConsultationController) GetPatientList(ctx *echo.Context) error {
 
 	data, err := c.UseCase.GetPatientConsultations(ctx.Request().Context(), claims.PatientID)
 	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: constants.MsgInternalServerError, Errors: err.Error()})
 	}
 
 	return ctx.JSON(http.StatusOK, model.WebResponse[[]model.ConsultationResponse]{
@@ -61,7 +62,7 @@ func (c *ConsultationController) GetNakesList(ctx *echo.Context) error {
 
 	data, err := c.UseCase.GetNakesConsultations(ctx.Request().Context(), claims.NakesID, claims.FaskesID)
 	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: constants.MsgInternalServerError, Errors: err.Error()})
 	}
 
 	return ctx.JSON(http.StatusOK, model.WebResponse[[]model.NakesConsultationItem]{
@@ -79,10 +80,10 @@ func (c *ConsultationController) Reply(ctx *echo.Context) error {
 
 	req := new(model.ReplyConsultationRequest)
 	if err := ctx.Bind(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "bad request", Errors: err.Error()})
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: constants.MsgBadRequest, Errors: err.Error()})
 	}
 	if err := ctx.Validate(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: "validation error", Errors: err.Error()})
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{Message: constants.MsgValidationError, Errors: err.Error()})
 	}
 
 	if err := c.UseCase.ReplyConsultation(ctx.Request().Context(), consultationID, claims.NakesID, req); err != nil {
@@ -92,7 +93,7 @@ func (c *ConsultationController) Reply(ctx *echo.Context) error {
 		if strings.Contains(err.Error(), "not found") {
 			return ctx.JSON(http.StatusNotFound, model.WebResponse[any]{Message: "konsultasi tidak ditemukan", Errors: err.Error()})
 		}
-		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: constants.MsgInternalServerError, Errors: err.Error()})
 	}
 
 	return ctx.JSON(http.StatusOK, model.WebResponse[any]{

@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/usecase"
 
@@ -17,13 +18,13 @@ func (c *FaskesAuthController) Register(ctx *echo.Context) error {
 	req := new(model.FaskesRegisterRequest)
 	if err := ctx.Bind(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  err.Error(),
 		})
 	}
 	if err := ctx.Validate(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "validation error",
+			Message: constants.MsgValidationError,
 			Errors:  err.Error(),
 		})
 	}
@@ -31,12 +32,12 @@ func (c *FaskesAuthController) Register(ctx *echo.Context) error {
 	if err := c.UseCase.Register(ctx.Request().Context(), req); err != nil {
 		if errors.Is(err, usecase.ErrUsernameAlreadyExists) || errors.Is(err, usecase.ErrPhoneAlreadyExists) {
 			return ctx.JSON(http.StatusConflict, model.WebResponse[any]{
-				Message: "conflict",
+				Message: constants.MsgConflict,
 				Errors:  err.Error(),
 			})
 		}
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}
@@ -50,13 +51,13 @@ func (c *FaskesAuthController) Login(ctx *echo.Context) error {
 	req := new(model.FaskesLoginRequest)
 	if err := ctx.Bind(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  err.Error(),
 		})
 	}
 	if err := ctx.Validate(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "validation error",
+			Message: constants.MsgValidationError,
 			Errors:  err.Error(),
 		})
 	}
