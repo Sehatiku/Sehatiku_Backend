@@ -69,7 +69,8 @@ func (u *PatientBaselineUseCase) GetLatestBaseline(ctx context.Context, faskesID
 // CreateBaseline mencatat versi baseline BARU (insert-only). Tidak menimpa baseline lama;
 // baris terbaru menjadi baseline aktif yang dipakai skoring ML berikutnya.
 func (u *PatientBaselineUseCase) CreateBaseline(ctx context.Context, faskesID, patientID string, req *model.CreateBaselineRequest) (*model.BaselineDetailResponse, error) {
-	if _, err := u.ensurePatientOwned(faskesID, patientID); err != nil {
+	patient, err := u.ensurePatientOwned(faskesID, patientID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -94,7 +95,7 @@ func (u *PatientBaselineUseCase) CreateBaseline(ctx context.Context, faskesID, p
 		recordedAt = parsed
 	}
 
-	baseline := buildBaseline(patientID, req.Baseline)
+	baseline := buildBaseline(patient, req.Baseline)
 	baseline.RecordedAt = recordedAt
 	recordedBy := req.RecordedByNakesID
 	baseline.RecordedByNakesID = &recordedBy

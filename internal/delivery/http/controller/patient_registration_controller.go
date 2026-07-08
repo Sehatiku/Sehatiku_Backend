@@ -42,6 +42,35 @@ func (c *PatientRegistrationController) ScanKTP(ctx *echo.Context) error {
 	})
 }
 
+func (c *PatientRegistrationController) ScanBaseline(ctx *echo.Context) error {
+	fh, err := ctx.FormFile("file")
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
+			Message: constants.MsgBadRequest,
+			Errors:  "field 'file' wajib diisi dengan dokumen template baseline (gambar/PDF)",
+		})
+	}
+
+	file, err := fh.Open()
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
+			Message: constants.MsgInternalServerError,
+			Errors:  err.Error(),
+		})
+	}
+	defer file.Close()
+
+	resp, err := c.UseCase.ScanBaseline(ctx.Request().Context(), file, fh.Filename)
+	if err != nil {
+		return mapRegistrationError(ctx, err)
+	}
+
+	return ctx.JSON(http.StatusOK, model.WebResponse[*model.PatientBaselineRequest]{
+		Message: "template baseline berhasil di-scan",
+		Data:    resp,
+	})
+}
+
 func (c *PatientRegistrationController) RegisterPatient(ctx *echo.Context) error {
 	claims := getFaskesClaimsFromCtx(ctx)
 

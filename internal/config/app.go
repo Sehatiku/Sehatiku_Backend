@@ -80,6 +80,17 @@ func BootStrap(config *BootStrapConfig) {
 		config.Log,
 	)
 
+	// Gateway Gemini TERPISAH untuk OCR baseline (register/baseline-ocr) memakai key/model
+	// sendiri agar kuota & billing tidak bercampur dengan summary. Bila GEMINI_OCR_API_KEY
+	// kosong, fallback ke key/model summary supaya OCR tetap jalan tanpa konfigurasi tambahan.
+	geminiOCRKey := config.Config.GetString("GEMINI_OCR_API_KEY")
+	geminiOCRModel := config.Config.GetString("GEMINI_OCR_MODEL")
+	if geminiOCRKey == "" {
+		geminiOCRKey = config.Config.GetString("GEMINI_API_KEY")
+		geminiOCRModel = config.Config.GetString("GEMINI_MODEL")
+	}
+	geminiOCRGateway := geminigw.New(geminiOCRKey, geminiOCRModel, config.Log)
+
 	// Use Cases
 	faskesAuthUC := &usecase.FaskesAuthUseCase{
 		DB:          config.DB,
@@ -150,6 +161,7 @@ func BootStrap(config *BootStrapConfig) {
 		PendingCredential: pendingCredentialRepo,
 		BaselineRepo:      patientClinicalBaselineRepo,
 		OCRGateway:        ktpOCRGateway,
+		Gemini:            geminiOCRGateway,
 		WhatsApp:          config.WhatsApp,
 		Log:               config.Log,
 	}

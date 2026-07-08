@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"sehatiku-backend/internal/constants"
+	"sehatiku-backend/internal/gateway/gemini"
 	"sehatiku-backend/internal/gateway/ml"
 	"sehatiku-backend/internal/gateway/ocr"
 	"sehatiku-backend/internal/model"
@@ -191,8 +192,17 @@ func mapRegistrationError(ctx *echo.Context, err error) error {
 			Message: constants.MsgBadRequest,
 			Errors:  err.Error(),
 		})
+	case errors.Is(err, gemini.ErrGeminiBadRequest),
+		errors.Is(err, gemini.ErrGeminiEmpty):
+		// Dokumen tak terbaca / ekstraksi gagal → minta faskes unggah dokumen lebih jelas.
+		return ctx.JSON(http.StatusUnprocessableEntity, model.WebResponse[any]{
+			Message: constants.MsgUnprocessableEntity,
+			Errors:  "dokumen template baseline tidak terbaca, coba unggah scan/foto yang lebih jelas",
+		})
 	case errors.Is(err, ocr.ErrOCRUnauthorized),
-		errors.Is(err, ocr.ErrOCRUpstream):
+		errors.Is(err, ocr.ErrOCRUpstream),
+		errors.Is(err, gemini.ErrGeminiUnauthorized),
+		errors.Is(err, gemini.ErrGeminiUpstream):
 		return ctx.JSON(http.StatusBadGateway, model.WebResponse[any]{
 			Message: constants.MsgBadGateway,
 			Errors:  err.Error(),

@@ -20,41 +20,60 @@ type PatientRegisterRequest struct {
 	Baseline        PatientBaselineRequest `json:"baseline"          validate:"required"`
 }
 
-// PatientBaselineRequest holds the full ML clinical baseline collected at registration.
+// PatientBaselineRequest holds the clinical baseline the faskes actually inputs at
+// registration (or via the baseline-ocr prefill). It carries ONLY raw measured/lab values
+// plus two dropdowns; every categorical/derived field (bmi_category, central_obesity,
+// hypertension_status, diabetes_status, cluster_id, diagnosis_cluster, clinical_group) is
+// computed server-side (see internal/usecase/baseline_derivation.go), and age_years/sex are
+// taken from the patient record — so the faskes never re-types data a computer can derive.
 // Boolean fields use *bool so that false is distinguishable from absent.
 type PatientBaselineRequest struct {
-	AgeYears             int     `json:"age_years"              validate:"required,min=0,max=150"`
-	Sex                  string  `json:"sex"                    validate:"required,oneof=male female"`
+	// Anthropometry (bmi_category & central_obesity derived from these)
 	BMI                  float64 `json:"bmi"                    validate:"required,min=5,max=100"`
-	BMICategory          string  `json:"bmi_category"           validate:"required,oneof=underweight normal overweight obese"`
 	WaistCircumferenceCm float64 `json:"waist_circumference_cm" validate:"required,min=20,max=250"`
-	CentralObesity       *bool   `json:"central_obesity"        validate:"required"`
-	SmokingStatus        string  `json:"smoking_status"         validate:"required,oneof=never former current"`
-	AlcoholUse           *bool   `json:"alcohol_use"            validate:"required"`
-	PhysicalActivity     string  `json:"physical_activity"      validate:"required,oneof=sedentary light moderate active"`
-	FamilyHistoryDiabetes *bool  `json:"family_history_diabetes" validate:"required"`
-	FamilyHistoryCVD      *bool  `json:"family_history_cvd"      validate:"required"`
-	SystolicBPMmhg       int     `json:"systolic_bp_mmhg"       validate:"required,min=40,max=300"`
-	DiastolicBPMmhg      int     `json:"diastolic_bp_mmhg"      validate:"required,min=20,max=200"`
-	HypertensionStatus   string  `json:"hypertension_status"    validate:"required"`
-	FastingGlucoseMgdl   float64 `json:"fasting_glucose_mgdl"   validate:"required,min=20,max=1000"`
-	HbA1cPct             float64 `json:"hba1c_pct"              validate:"required,min=1,max=20"`
-	DiabetesStatus       string  `json:"diabetes_status"        validate:"required"`
+
+	// Lifestyle
+	SmokingStatus    string `json:"smoking_status"    validate:"required,oneof=never former current"`
+	AlcoholUse       *bool  `json:"alcohol_use"       validate:"required"`
+	PhysicalActivity string `json:"physical_activity" validate:"required,oneof=sedentary light moderate active"`
+
+	// Family history
+	FamilyHistoryDiabetes *bool `json:"family_history_diabetes" validate:"required"`
+	FamilyHistoryCVD      *bool `json:"family_history_cvd"      validate:"required"`
+
+	// Blood pressure (hypertension_status derived from these)
+	SystolicBPMmhg  int `json:"systolic_bp_mmhg"  validate:"required,min=40,max=300"`
+	DiastolicBPMmhg int `json:"diastolic_bp_mmhg" validate:"required,min=20,max=200"`
+
+	// Glucose / diabetes (diabetes_status derived from these)
+	FastingGlucoseMgdl float64 `json:"fasting_glucose_mgdl" validate:"required,min=20,max=1000"`
+	HbA1cPct           float64 `json:"hba1c_pct"            validate:"required,min=1,max=20"`
+
+	// Lipid panel
 	TotalCholesterolMgdl float64 `json:"total_cholesterol_mgdl" validate:"required,min=50,max=1000"`
 	HDLMgdl              float64 `json:"hdl_mgdl"               validate:"required,min=5,max=200"`
 	LDLMgdl              float64 `json:"ldl_mgdl"               validate:"required,min=5,max=600"`
 	TriglyceidesMgdl     float64 `json:"triglycerides_mgdl"     validate:"required,min=10,max=5000"`
-	CVDRisk10YrPct       float64 `json:"cvd_risk_10yr_pct"      validate:"gte=0,max=100"`
-	CVDRiskCategory      string  `json:"cvd_risk_category"      validate:"required,oneof=low moderate high very_high"`
-	OnAntihypertensive   *bool   `json:"on_antihypertensive"    validate:"required"`
-	OnAntidiabetic       *bool   `json:"on_antidiabetic"        validate:"required"`
-	OnStatin             *bool   `json:"on_statin"              validate:"required"`
-	TargetRisk           string  `json:"target_risk"            validate:"required"`
-	EGFR                 float64 `json:"egfr"                   validate:"required,min=0,max=200"`
-	UACR                 float64 `json:"uacr"                   validate:"gte=0"`
-	ClusterID            *int    `json:"cluster_id"`
-	DiagnosisCluster     *string `json:"diagnosis_cluster"`
-	ClinicalGroup        *string `json:"clinical_group"`
+
+	// CVD risk — optional (isi bila laporan memuatnya; tidak diturunkan pakai formula)
+	CVDRisk10YrPct  float64 `json:"cvd_risk_10yr_pct" validate:"omitempty,gte=0,max=100"`
+	CVDRiskCategory string  `json:"cvd_risk_category" validate:"omitempty,oneof=low moderate high very_high"`
+
+	// Medications
+	OnAntihypertensive *bool `json:"on_antihypertensive" validate:"required"`
+	OnAntidiabetic     *bool `json:"on_antidiabetic"     validate:"required"`
+	OnStatin           *bool `json:"on_statin"           validate:"required"`
+
+	// Risk target dropdown {Rendah, Menengah, Tinggi}. clinical_group is set = target_risk.
+	TargetRisk string `json:"target_risk" validate:"required,oneof=low medium high"`
+
+	// Kidney function
+	EGFR float64 `json:"egfr" validate:"required,min=0,max=200"`
+	UACR float64 `json:"uacr" validate:"omitempty,gte=0"`
+
+	// Diagnosis dropdown {diabetes, hipertensi, komplikasi} — one input replacing cluster_id +
+	// diagnosis_cluster. Optional: defaults from the patient's disease_type when absent.
+	Diagnosis *string `json:"diagnosis" validate:"omitempty,oneof=diabetes hipertensi komplikasi"`
 }
 
 type PatientRegisterResponse struct {

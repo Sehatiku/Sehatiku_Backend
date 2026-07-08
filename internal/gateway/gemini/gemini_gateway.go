@@ -25,6 +25,7 @@ package gemini
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"sehatiku-backend/internal/model"
 
 	"go.uber.org/zap"
 )
@@ -76,8 +79,14 @@ func New(apiKey, model string, log *zap.Logger) *GeminiGateway {
 
 // --- request/response shapes (subset of the Gemini REST API) ---
 
+type genInlineData struct {
+	MimeType string `json:"mime_type"`
+	Data     string `json:"data"` // base64-encoded bytes
+}
+
 type genPart struct {
-	Text string `json:"text"`
+	Text       string         `json:"text,omitempty"`
+	InlineData *genInlineData `json:"inline_data,omitempty"`
 }
 
 type genContent struct {
@@ -93,9 +102,10 @@ type thinkingConfig struct {
 }
 
 type genConfig struct {
-	Temperature     float64         `json:"temperature"`
-	MaxOutputTokens int             `json:"maxOutputTokens"`
-	ThinkingConfig  *thinkingConfig `json:"thinkingConfig,omitempty"`
+	Temperature      float64         `json:"temperature"`
+	MaxOutputTokens  int             `json:"maxOutputTokens"`
+	ThinkingConfig   *thinkingConfig `json:"thinkingConfig,omitempty"`
+	ResponseMIMEType string          `json:"responseMimeType,omitempty"`
 }
 
 type generateRequest struct {
@@ -114,23 +124,32 @@ type generateResponse struct {
 
 // GenerateSummary mengirim prompt ke Gemini dan mengembalikan teks narasi tunggal.
 func (g *GeminiGateway) GenerateSummary(ctx context.Context, prompt string) (string, error) {
-	if g.APIKey == "" {
-		return "", ErrGeminiUnauthorized
-	}
-
 	cfg := genConfig{
 		Temperature:     0.4,
 		MaxOutputTokens: 1024,
 	}
-	// thinkingBudget hanya valid untuk model thinking 2.5; mengirimnya ke model lain
-	// (mis. 2.0-flash) bisa ditolak 400, jadi hanya disetel saat model 2.5.
-	if strings.Contains(g.Model, "2.5") {
-		cfg.ThinkingConfig = &thinkingConfig{ThinkingBudget: 0}
-	}
+	g.applyThinking(&cfg)
 
 	reqBody := generateRequest{
 		Contents:         []genContent{{Parts: []genPart{{Text: prompt}}}},
 		GenerationConfig: cfg,
+	}
+	return g.doGenerate(ctx, reqBody)
+}
+
+// applyThinking mematikan "thinking" hanya untuk model 2.5 (lihat thinkingConfig). Mengirim
+// thinkingBudget ke model lain (mis. 2.0-flash) bisa ditolak 400.
+func (g *GeminiGateway) applyThinking(cfg *genConfig) {
+	if strings.Contains(g.Model, "2.5") {
+		cfg.ThinkingConfig = &thinkingConfig{ThinkingBudget: 0}
+	}
+}
+
+// doGenerate mengeksekusi satu panggilan generateContent dan mengembalikan teks kandidat
+// tergabung. Dipakai bersama oleh GenerateSummary (narasi) dan ExtractBaseline (JSON).
+func (g *GeminiGateway) doGenerate(ctx context.Context, reqBody generateRequest) (string, error) {
+	if g.APIKey == "" {
+		return "", ErrGeminiUnauthorized
 	}
 
 	payload, err := json.Marshal(reqBody)
@@ -189,4 +208,70 @@ func (g *GeminiGateway) GenerateSummary(ctx context.Context, prompt string) (str
 		return "", ErrGeminiEmpty
 	}
 	return text, nil
+}
+
+// baselineExtractPrompt menginstruksikan Gemini membaca dokumen template baseline Sehatiku
+// yang sudah diisi faskes dan mengembalikan JSON ketat. Hanya field yang diisi faskes yang
+// diminta — field turunan (bmi_category, hypertension_status, dll.) dihitung backend, jadi
+// TIDAK diminta di sini. Nilai yang tidak terbaca dikosongkan (0 / null), tidak dikarang.
+const baselineExtractPrompt = `Anda mengekstrak data dari dokumen "Template Baseline Klinis Sehatiku" yang sudah diisi (hasil scan/foto).
+Kembalikan HANYA objek JSON valid (tanpa markdown, tanpa penjelasan) dengan field berikut:
+{
+  "bmi": number,                       // Indeks Massa Tubuh
+  "waist_circumference_cm": number,    // lingkar pinggang (cm)
+  "smoking_status": "never|former|current",
+  "alcohol_use": boolean,
+  "physical_activity": "sedentary|light|moderate|active",
+  "family_history_diabetes": boolean,
+  "family_history_cvd": boolean,
+  "systolic_bp_mmhg": integer,
+  "diastolic_bp_mmhg": integer,
+  "fasting_glucose_mgdl": number,      // gula darah puasa
+  "hba1c_pct": number,
+  "total_cholesterol_mgdl": number,
+  "hdl_mgdl": number,
+  "ldl_mgdl": number,
+  "triglycerides_mgdl": number,
+  "cvd_risk_10yr_pct": number,         // opsional; 0 bila tidak tercantum
+  "cvd_risk_category": "low|moderate|high|very_high",  // opsional; "" bila tidak tercantum
+  "on_antihypertensive": boolean,
+  "on_antidiabetic": boolean,
+  "on_statin": boolean,
+  "target_risk": "low|medium|high",    // Rendah=low, Menengah=medium, Tinggi=high
+  "egfr": number,
+  "uacr": number,                      // opsional; 0 bila tidak tercantum
+  "diagnosis": "diabetes|hipertensi|komplikasi"  // opsional; "" bila tidak tercantum
+}
+Aturan: gunakan satuan seperti tertulis di dokumen; untuk checkbox/centang, true bila dicentang "Ya"/ada tanda, false bila "Tidak"/kosong; JANGAN mengarang nilai yang tidak ada—isi 0 untuk angka atau "" untuk string.`
+
+// ExtractBaseline mengirim dokumen (gambar/PDF) template baseline terisi ke Gemini vision dan
+// mengembalikan field baseline yang diisi faskes untuk mem-prefill form registrasi. Ini HANYA
+// prefill; faskes tetap meninjau/mengoreksi sebelum submit.
+func (g *GeminiGateway) ExtractBaseline(ctx context.Context, fileBytes []byte, mimeType string) (*model.PatientBaselineRequest, error) {
+	cfg := genConfig{
+		Temperature:      0.0, // ekstraksi deterministik, bukan kreatif
+		MaxOutputTokens:  2048,
+		ResponseMIMEType: "application/json",
+	}
+	g.applyThinking(&cfg)
+
+	reqBody := generateRequest{
+		Contents: []genContent{{Parts: []genPart{
+			{Text: baselineExtractPrompt},
+			{InlineData: &genInlineData{MimeType: mimeType, Data: base64.StdEncoding.EncodeToString(fileBytes)}},
+		}}},
+		GenerationConfig: cfg,
+	}
+
+	text, err := g.doGenerate(ctx, reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	var out model.PatientBaselineRequest
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		g.Log.Warn("Gemini baseline extraction: invalid JSON", zap.String("body", text), zap.Error(err))
+		return nil, fmt.Errorf("%w: ekstraksi baseline tidak menghasilkan JSON valid", ErrGeminiBadRequest)
+	}
+	return &out, nil
 }

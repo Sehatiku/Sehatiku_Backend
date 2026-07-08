@@ -62,6 +62,7 @@ func (r *RouteConfig) SetupFaskesAuthedRoute() {
 	g.GET("/patients", r.PatientController.ListPatients)
 	g.GET("/patients/:id", r.PatientController.GetPatientDetail)
 	g.POST("/patients/register/ktp-ocr", r.PatientRegistrationController.ScanKTP)
+	g.POST("/patients/register/baseline-ocr", r.PatientRegistrationController.ScanBaseline)
 	g.POST("/patients/register", r.PatientRegistrationController.RegisterPatient)
 	g.GET("/patients/:id/baseline", r.BaselineController.GetLatest)
 	g.POST("/patients/:id/baseline", r.BaselineController.Create)
