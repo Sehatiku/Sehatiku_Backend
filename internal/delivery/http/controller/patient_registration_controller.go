@@ -65,7 +65,7 @@ func (c *PatientRegistrationController) ScanBaseline(ctx *echo.Context) error {
 		return mapRegistrationError(ctx, err)
 	}
 
-	return ctx.JSON(http.StatusOK, model.WebResponse[*model.PatientBaselineRequest]{
+	return ctx.JSON(http.StatusOK, model.WebResponse[*model.BaselineOCRResponse]{
 		Message: "template baseline berhasil di-scan",
 		Data:    resp,
 	})

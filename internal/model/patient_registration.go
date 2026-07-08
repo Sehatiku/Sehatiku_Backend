@@ -76,6 +76,15 @@ type PatientBaselineRequest struct {
 	Diagnosis *string `json:"diagnosis" validate:"omitempty,oneof=diabetes hipertensi komplikasi"`
 }
 
+// BaselineOCRResponse adalah hasil scan dokumen template baseline. DiseaseType diturunkan
+// dari dropdown Diagnosis yang terbaca di dokumen (lihat usecase.deriveDiseaseType) agar
+// faskes juga bisa mem-prefill field disease_type di form registrasi, bukan cuma baseline.
+// "" bila diagnosis tidak terbaca/tidak dikenali.
+type BaselineOCRResponse struct {
+	DiseaseType string                  `json:"disease_type"`
+	Baseline    *PatientBaselineRequest `json:"baseline"`
+}
+
 type PatientRegisterResponse struct {
 	PatientID   string    `json:"patient_id"`
 	FaskesID    string    `json:"faskes_id"`
