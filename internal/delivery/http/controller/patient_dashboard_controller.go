@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 
 	"github.com/labstack/echo/v5"
@@ -22,7 +23,7 @@ func (c *PatientDashboardController) GetDashboard(ctx *echo.Context) error {
 	data, err := c.UseCase.GetDashboard(ctx.Request().Context(), claims.PatientID)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}

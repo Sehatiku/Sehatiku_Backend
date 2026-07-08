@@ -108,7 +108,6 @@ func (u *ScoringUseCase) ScorePatient(ctx context.Context, patientID string) (*m
 		},
 	}
 
-	// 3. ML prediction.
 	res, err := u.ML.PredictHealthScore(ctx, req)
 	if err != nil {
 		return nil, err
@@ -121,7 +120,6 @@ func (u *ScoringUseCase) ScorePatient(ctx context.Context, patientID string) (*m
 		res.TopPenalties = []string{healthyPenaltyMessage}
 	}
 
-	// 4. persist to risk_scores.
 	penalties, _ := json.Marshal(res.TopPenalties)
 	rs := &entity.RiskScore{
 		PatientID:      patientID,

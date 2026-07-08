@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 	"strconv"
 
@@ -34,7 +35,7 @@ func (c *PatientController) ListPatients(ctx *echo.Context) error {
 	items, paging, err := c.UseCase.ListPatients(ctx.Request().Context(), claims.FaskesID, page, size)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}
@@ -52,7 +53,7 @@ func (c *PatientController) GetPatientDetail(ctx *echo.Context) error {
 	patientID := ctx.Param("id")
 	if patientID == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "patient id wajib diisi",
 		})
 	}
@@ -74,7 +75,7 @@ func (c *PatientController) GetNakesPatientDetail(ctx *echo.Context) error {
 	patientID := ctx.Param("id")
 	if patientID == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "patient id wajib diisi",
 		})
 	}

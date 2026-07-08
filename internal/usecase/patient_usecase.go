@@ -158,7 +158,6 @@ func (u *PatientUseCase) GetNakesPatientDetail(ctx context.Context, faskesID, na
 		return nil, err
 	}
 
-	// 1. Fetch Latest Baseline
 	var baselineDetail *model.BaselineDetailResponse
 	baseline, err := u.BaselineRepo.FindLatestByPatient(u.DB, patientID)
 	if err != nil {
@@ -215,14 +214,12 @@ func (u *PatientUseCase) GetNakesPatientDetail(ctx context.Context, faskesID, na
 		}
 	}
 
-	// 2. Fetch Record History (Daily Logs)
 	historyRows, err := u.HistoryRepo.GetRecordHistory(u.DB, patientID, 7) // 7 days of daily logs
 	var dailyLogs []model.RecordHistoryItem
 	if err == nil {
 		dailyLogs = mapRecordHistoryRows(historyRows)
 	}
 
-	// 3. Fetch Latest Risk Score
 	var riskFactorStatus *model.PatientRiskFactorStatus
 	riskScore, err := u.RiskScoreRepo.FindLatestByPatient(u.DB, patientID)
 	if err == nil && riskScore != nil {
@@ -234,7 +231,6 @@ func (u *PatientUseCase) GetNakesPatientDetail(ctx context.Context, faskesID, na
 		}
 	}
 
-	// 4. Fetch Health Score History
 	var healthScoreHistory []model.HealthScorePoint
 	scores, err := u.RiskScoreRepo.ListByPatient(u.DB, patientID, 7) // up to 7 latest history
 	if err == nil {

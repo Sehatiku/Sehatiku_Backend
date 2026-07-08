@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/usecase"
 	"strconv"
@@ -28,13 +29,13 @@ func (c *RecordController) Create(ctx *echo.Context) error {
 	req := new(model.CreateRecordRequest)
 	if err := ctx.Bind(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  err.Error(),
 		})
 	}
 	if err := ctx.Validate(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "validation error",
+			Message: constants.MsgValidationError,
 			Errors:  err.Error(),
 		})
 	}
@@ -43,12 +44,12 @@ func (c *RecordController) Create(ctx *echo.Context) error {
 	if err != nil {
 		if errors.Is(err, usecase.ErrInvalidHealthLog) || errors.Is(err, usecase.ErrNoMetricProvided) {
 			return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-				Message: "bad request",
+				Message: constants.MsgBadRequest,
 				Errors:  err.Error(),
 			})
 		}
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}
@@ -68,7 +69,7 @@ func (c *RecordController) GetTodayStatus(ctx *echo.Context) error {
 	data, err := c.UseCase.GetTodayStatus(ctx.Request().Context(), claims.PatientID)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}
@@ -88,7 +89,7 @@ func (c *RecordController) GetLoggedToday(ctx *echo.Context) error {
 	logged, err := c.UseCase.GetLoggedToday(ctx.Request().Context(), claims.PatientID)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}
@@ -112,7 +113,7 @@ func (c *RecordController) GetHistory(ctx *echo.Context) error {
 	data, err := c.UseCase.GetHistory(ctx.Request().Context(), claims.PatientID, limit)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}

@@ -240,7 +240,6 @@ func lineChartSVG(series []chartSeries, unit string) template.HTML {
 	var b strings.Builder
 	fmt.Fprintf(&b, `<svg viewBox="0 0 %d %d" width="100%%" preserveAspectRatio="xMidYMid meet" role="img">`, chartW, chartH)
 	b.WriteString(`<rect x="0" y="0" width="100%" height="100%" fill="#fafafa"/>`)
-	// gridlines + label sumbu-y (min, tengah, max)
 	for _, gv := range []float64{min, (min + max) / 2, max} {
 		y := yAt(gv)
 		fmt.Fprintf(&b, `<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="#e5e7eb" stroke-width="1"/>`, padLeft, y, chartW-padRight, y)

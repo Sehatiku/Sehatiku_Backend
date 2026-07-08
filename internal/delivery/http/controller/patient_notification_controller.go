@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 	"strings"
 
@@ -25,7 +26,7 @@ func (c *PatientNotificationController) GetNotifications(ctx *echo.Context) erro
 
 	data, err := c.UseCase.GetNotifications(ctx.Request().Context(), claims.PatientID)
 	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: constants.MsgInternalServerError, Errors: err.Error()})
 	}
 
 	return ctx.JSON(http.StatusOK, model.WebResponse[[]model.PatientNotificationResponse]{
@@ -39,7 +40,7 @@ func (c *PatientNotificationController) GetUnreadCount(ctx *echo.Context) error 
 
 	data, err := c.UseCase.GetUnreadCount(ctx.Request().Context(), claims.PatientID)
 	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: constants.MsgInternalServerError, Errors: err.Error()})
 	}
 
 	return ctx.JSON(http.StatusOK, model.WebResponse[*model.UnreadCountResponse]{
@@ -59,7 +60,7 @@ func (c *PatientNotificationController) MarkRead(ctx *echo.Context) error {
 		if strings.Contains(err.Error(), "not found") {
 			return ctx.JSON(http.StatusNotFound, model.WebResponse[any]{Message: "notifikasi tidak ditemukan", Errors: err.Error()})
 		}
-		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: constants.MsgInternalServerError, Errors: err.Error()})
 	}
 
 	return ctx.JSON(http.StatusOK, model.WebResponse[any]{
@@ -73,7 +74,7 @@ func (c *PatientNotificationController) MarkAllRead(ctx *echo.Context) error {
 
 	data, err := c.UseCase.MarkAllRead(ctx.Request().Context(), claims.PatientID)
 	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: "internal server error", Errors: err.Error()})
+		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{Message: constants.MsgInternalServerError, Errors: err.Error()})
 	}
 
 	return ctx.JSON(http.StatusOK, model.WebResponse[*model.MarkAllReadResponse]{

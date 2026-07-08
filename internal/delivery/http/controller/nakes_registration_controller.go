@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/usecase"
 
@@ -16,7 +17,7 @@ func (c *NakesRegistrationController) ScanKTP(ctx *echo.Context) error {
 	fh, err := ctx.FormFile("file")
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "field 'file' wajib diisi dengan gambar KTP",
 		})
 	}
@@ -24,7 +25,7 @@ func (c *NakesRegistrationController) ScanKTP(ctx *echo.Context) error {
 	file, err := fh.Open()
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}
@@ -47,13 +48,13 @@ func (c *NakesRegistrationController) RegisterNakes(ctx *echo.Context) error {
 	req := new(model.NakesRegisterRequest)
 	if err := ctx.Bind(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  err.Error(),
 		})
 	}
 	if err := ctx.Validate(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "validation error",
+			Message: constants.MsgValidationError,
 			Errors:  err.Error(),
 		})
 	}

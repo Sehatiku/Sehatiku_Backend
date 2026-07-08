@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 	"sehatiku-backend/internal/repository"
 	"sehatiku-backend/internal/usecase"
@@ -18,13 +19,13 @@ func (c *TokenController) Refresh(ctx *echo.Context) error {
 	req := new(model.RefreshTokenRequest)
 	if err := ctx.Bind(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  err.Error(),
 		})
 	}
 	if err := ctx.Validate(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "validation error",
+			Message: constants.MsgValidationError,
 			Errors:  err.Error(),
 		})
 	}
@@ -33,12 +34,12 @@ func (c *TokenController) Refresh(ctx *echo.Context) error {
 	if err != nil {
 		if errors.Is(err, repository.ErrRefreshTokenInvalid) || errors.Is(err, repository.ErrRefreshTokenReused) {
 			return ctx.JSON(http.StatusUnauthorized, model.WebResponse[any]{
-				Message: "unauthorized",
+				Message: constants.MsgUnauthorized,
 				Errors:  "refresh token tidak valid",
 			})
 		}
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}
@@ -54,13 +55,13 @@ func (c *TokenController) Logout(ctx *echo.Context) error {
 	req := new(model.LogoutRequest)
 	if err := ctx.Bind(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  err.Error(),
 		})
 	}
 	if err := ctx.Validate(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "validation error",
+			Message: constants.MsgValidationError,
 			Errors:  err.Error(),
 		})
 	}
@@ -70,7 +71,7 @@ func (c *TokenController) Logout(ctx *echo.Context) error {
 
 	if err := c.UseCase.Logout(ctx.Request().Context(), req, role, userID); err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}

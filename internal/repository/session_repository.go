@@ -83,7 +83,6 @@ func (r *SessionRepository) ValidateAndRotate(ctx context.Context, rawToken stri
 	tokenKey := fmt.Sprintf("refresh_token:%s", hash)
 	revokedKey := fmt.Sprintf("revoked_token:%s", hash)
 
-	// Deteksi reuse
 	reuseExists, err := r.Redis.Exists(ctx, revokedKey).Result()
 	if err != nil {
 		return data, "", fmt.Errorf("checking revoked token: %w", err)

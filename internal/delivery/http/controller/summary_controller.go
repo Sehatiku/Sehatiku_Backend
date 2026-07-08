@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/delivery/http/report"
 	"sehatiku-backend/internal/model"
 	"strconv"
@@ -43,7 +44,7 @@ func (c *SummaryController) GetNakesPatientSummary(ctx *echo.Context) error {
 	patientID := ctx.Param("id")
 	if patientID == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "patient id wajib diisi",
 		})
 	}
@@ -67,7 +68,7 @@ func (c *SummaryController) GetNakesPatientBrief(ctx *echo.Context) error {
 	patientID := ctx.Param("id")
 	if patientID == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "patient id wajib diisi",
 		})
 	}
@@ -90,7 +91,7 @@ func (c *SummaryController) GetNakesPatientBriefReport(ctx *echo.Context) error 
 	patientID := ctx.Param("id")
 	if patientID == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "patient id wajib diisi",
 		})
 	}

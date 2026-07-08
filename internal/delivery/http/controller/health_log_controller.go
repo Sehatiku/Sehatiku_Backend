@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 
 	"github.com/labstack/echo/v5"
@@ -25,7 +26,7 @@ func (c *HealthLogController) Create(ctx *echo.Context) error {
 	idempotencyKey := ctx.Request().Header.Get("Idempotency-Key")
 	if idempotencyKey == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "Idempotency-Key header wajib diisi",
 		})
 	}
@@ -33,13 +34,13 @@ func (c *HealthLogController) Create(ctx *echo.Context) error {
 	req := new(model.CreateHealthLogRequest)
 	if err := ctx.Bind(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  err.Error(),
 		})
 	}
 	if err := ctx.Validate(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "validation error",
+			Message: constants.MsgValidationError,
 			Errors:  err.Error(),
 		})
 	}

@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"sehatiku-backend/internal/constants"
 	"sehatiku-backend/internal/model"
 
 	"github.com/labstack/echo/v5"
@@ -39,7 +40,7 @@ func (c *NakesController) ListNakes(ctx *echo.Context) error {
 	items, err := c.UseCase.ListNakes(ctx.Request().Context(), claims.FaskesID)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.WebResponse[any]{
-			Message: "internal server error",
+			Message: constants.MsgInternalServerError,
 			Errors:  err.Error(),
 		})
 	}
@@ -56,7 +57,7 @@ func (c *NakesController) GetNakesDetail(ctx *echo.Context) error {
 	nakesID := ctx.Param("id")
 	if nakesID == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "nakes id wajib diisi",
 		})
 	}
@@ -78,7 +79,7 @@ func (c *NakesController) UpdateStatus(ctx *echo.Context) error {
 	nakesID := ctx.Param("id")
 	if nakesID == "" {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  "nakes id wajib diisi",
 		})
 	}
@@ -86,13 +87,13 @@ func (c *NakesController) UpdateStatus(ctx *echo.Context) error {
 	req := new(model.UpdateNakesStatusRequest)
 	if err := ctx.Bind(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "bad request",
+			Message: constants.MsgBadRequest,
 			Errors:  err.Error(),
 		})
 	}
 	if err := ctx.Validate(req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, model.WebResponse[any]{
-			Message: "validation error",
+			Message: constants.MsgValidationError,
 			Errors:  err.Error(),
 		})
 	}

@@ -37,7 +37,6 @@ type ParsedMetric struct {
 //   - Alkohol     : "alkohol 2 unit", "minum alkohol 1"
 func ParseWAMessage(text string) ParsedMetric {
 	normalized := strings.TrimSpace(strings.ToLower(text))
-	// hapus tanda baca berlebih di awal/akhir, ganti tab/newline dengan spasi
 	normalized = strings.Map(func(r rune) rune {
 		if unicode.IsSpace(r) {
 			return ' '
@@ -123,7 +122,6 @@ func parseBP(s string) (ParsedMetric, bool) {
 
 // bpLookingLikeOnly: heuristik — string hampir seluruhnya adalah pola NNN/NNN ± sedikit teks
 func bpLookingLikeOnly(s string) bool {
-	// hapus pola bp sendiri, sisa tidak lebih dari 30 karakter
 	cleaned := bpRE.ReplaceAllString(s, "")
 	return len(strings.TrimSpace(cleaned)) <= 30
 }
@@ -247,7 +245,6 @@ var foodKeywords = []string{
 func parseFood(s string) (ParsedMetric, bool) {
 	for _, kw := range foodKeywords {
 		if strings.HasPrefix(s, kw) || strings.Contains(s, kw) {
-			// Kembalikan teks asli (case-insensitive sudah dinormalisasi) sebagai value_text
 			// Panjang maks 500 char ditegakkan usecase, bukan parser.
 			return ParsedMetric{MetricType: "food", ValueText: ptr(s)}, true
 		}
